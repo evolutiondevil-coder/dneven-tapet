@@ -68,9 +68,12 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           ./gradlew --no-daemon assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk "DnevenTapet-${VERSION_NAME}.apk"
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
-          "$APKSIGNER" verify --print-certs "DnevenTapet-${VERSION_NAME}.apk" | grep -E "Signer #1 certificate (DN|SHA-256)"
+          ls -la app/build/outputs/apk/release/
+          APK="DnevenTapet-${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          echo "Checking the signature with $APKSIGNER"
+          "$APKSIGNER" verify --print-certs "$APK" || { echo "::error::APK signature check failed"; exit 1; }
 
       - name: Upload APK
         if: github.event_name != 'pull_request'
