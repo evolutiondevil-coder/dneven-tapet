@@ -62,14 +62,17 @@ class WallpaperChangeTest {
         val wm = WallpaperManager.getInstance(context)
         val before = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
 
+        // A background refill (WorkManager) may already be running and fill the queue first;
+        // refill() then waits for it, so only the result counts, not who downloaded.
         val added = graph.engine.refill(minQueue = 4)
         val st = graph.library.value
+        Log.i(TAG, "refill added $added, queue now ${st.queue.size}")
         for (id in listOf("bing", "spotlight", "wikimedia", "apod")) {
             val s = st.sourceStatus[id]
             Log.i(TAG, "source $id: ok=${s?.lastSuccessAt} count=${s?.lastCount} error='${s?.lastError}'")
         }
         st.log.forEach { Log.i(TAG, "log: ${it.message}") }
-        assertTrue("nothing prepared, log=${st.log.map { it.message }}", added > 0 && st.queue.isNotEmpty())
+        assertTrue("nothing prepared, log=${st.log.map { it.message }}", st.queue.size >= 2)
 
         // Every keyless source must have answered with pictures.
         for (id in listOf("bing", "spotlight", "wikimedia", "apod")) {
