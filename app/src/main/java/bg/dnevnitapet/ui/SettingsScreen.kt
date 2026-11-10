@@ -89,8 +89,9 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
     val unrestricted = remember(tick) { Power.isUnrestricted(context) }
     val exact = remember(tick) { vm.canScheduleExact() }
-    val unusedPause by produceState<Boolean?>(null, tick) {
-        value = withContext(Dispatchers.IO) { Power.unusedAppPauseActive(context) }
+    val unusedPause by produceState<Boolean?>(initialValue = null, tick) {
+        val active = withContext(Dispatchers.IO) { Power.unusedAppPauseActive(context) }
+        value = active
     }
     val cache = remember(tick, st.queue.size, st.history.size, st.favorites.size) { vm.cacheBytes() }
     var showTime by remember { mutableStateOf(false) }
