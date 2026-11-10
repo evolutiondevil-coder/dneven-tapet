@@ -278,7 +278,12 @@ private fun RoundAction(
 
 @Composable
 private fun Onboarding(unrestricted: Boolean, busy: Boolean, onAllow: () -> Unit, onStart: () -> Unit) {
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+        // Explicit: with a translucent colour Compose cannot pick the matching text colour itself.
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
         Column(Modifier.padding(20.dp)) {
             Text("Добре дошъл!", style = MaterialTheme.typography.headlineSmall)
             Text(
