@@ -121,6 +121,38 @@ class WallpaperEngine(
         }
     }
 
+    /**
+     * "Избери": sets a prepared picture the user found while browsing with "Следваща".
+     * The prepared pictures browsed past before it were passed over, so they are dropped
+     * and not offered again.
+     */
+    suspend fun chooseFromQueue(key: String): ChangeResult = changeMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val queue = library.value.queue
+            val index = queue.indexOfFirst { it.key == key }
+            if (index < 0) return@withContext ChangeResult.Failed("Снимката вече не е в списъка")
+            val item = queue[index]
+            if (!File(item.file).exists()) return@withContext ChangeResult.Failed("Файлът на снимката липсва")
+            try {
+                setter.apply(File(item.file), settings.value.target)
+            } catch (e: Exception) {
+                log("Грешка при смяна на тапета: ${describe(e)}")
+                return@withContext ChangeResult.Failed(describe(e))
+            }
+            val skipped = queue.take(index).map { it.key }.toSet()
+            library.update { st ->
+                st.copy(
+                    queue = st.queue.filter { it.key != key && it.key !in skipped },
+                    seen = (st.seen + skipped).distinct().takeLast(SEEN_LIMIT),
+                )
+            }
+            val shown = commitShown(item, Trigger.MANUAL)
+            pingUnsplash(item.candidate)
+            onChanged?.invoke()
+            ChangeResult.Changed(shown)
+        }
+    }
+
     private suspend fun takeFromQueue(preferFresh: Boolean): StoredImage? {
         var taken: StoredImage? = null
         val today = LocalDate.now()

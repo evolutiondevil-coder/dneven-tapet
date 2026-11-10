@@ -39,6 +39,32 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
 shot 02-welcome 5
 tap "Започни" && shot 03-main-screen 30
+
+# Browsing must only preview; "Избери" is what changes the wallpaper.
+w0=$(wallpaper_state)
+tap "Следваща" && shot 03a-browse-next 3
+tap "Следваща" && shot 03b-browse-next-2 3
+w1=$(wallpaper_state)
+tap "Предишна" && shot 03c-browse-previous 3
+tap "Избери" && shot 03d-after-choose 5
+w2=$(wallpaper_state)
+{
+  echo "before browsing:        $w0"
+  echo "after 2x Следваща:      $w1"
+  echo "after Избери:           $w2"
+  if [ "$w0" = "$w1" ]; then echo "OK: browsing did not change the wallpaper"; else echo "FAIL: browsing changed the wallpaper"; fi
+  if [ "$w1" != "$w2" ]; then echo "OK: Избери changed the wallpaper"; else echo "FAIL: Избери did not change the wallpaper"; fi
+} | tee -a "$OUT/summary.txt"
+
+# Narrow screen (360 dp) and bigger font: the buttons' labels must still fit on one line.
+adb shell wm density 480
+shot 03e-narrow-360dp 4
+adb shell settings put system font_scale 1.3
+shot 03f-narrow-big-font 4
+adb shell settings put system font_scale 1.0
+adb shell wm density reset
+sleep 3
+
 tap "Информация за снимката" && shot 04-info-sheet 3
 adb shell input keyevent KEYCODE_BACK
 sleep 2
@@ -80,4 +106,5 @@ after_widget=$(wallpaper_state)
 } | tee -a "$OUT/summary.txt"
 
 adb logcat -d > "$OUT/logcat-full.txt" || true
+if grep -q "^FAIL" "$OUT/summary.txt"; then status=1; fi
 exit $status

@@ -2,10 +2,13 @@ package bg.dnevnitapet.ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,8 +24,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
@@ -53,12 +58,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -80,6 +87,8 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val st by vm.library.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val loadingMore by vm.loadingMore.collectAsStateWithLifecycle()
+    val previewKey by vm.previewKey.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     var showInfo by remember { mutableStateOf(false) }
@@ -97,12 +106,36 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         }
     }
 
+    // What is on screen: the current wallpaper, or a picture being browsed.
     val current = st.current
-    Box(Modifier.fillMaxSize().background(Color(0xFF101418))) {
-        if (current != null) {
+    val shown: StoredImage? = previewKey?.let { key -> vm.browseList(st).firstOrNull { it.key == key } } ?: current
+    val isCurrent = shown != null && shown.key == current?.key
+    val queueIndex = shown?.let { s -> st.queue.indexOfFirst { it.key == s.key } } ?: -1
+    val position = when {
+        shown == null -> ""
+        isCurrent -> "Сегашният ти тапет"
+        queueIndex >= 0 -> "Предстояща ${queueIndex + 1} от ${st.queue.size}"
+        else -> "От историята · " + Format.moment(shown.shownAt)
+    }
+    val onNext by rememberUpdatedState(vm::showNext)
+    val onPrevious by rememberUpdatedState(vm::showPrevious)
+
+    Box(
+        Modifier.fillMaxSize().background(Color(0xFF101418)).pointerInput(Unit) {
+            // Swipe left/right to browse, like a photo gallery.
+            var total = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { total = 0f },
+                onDragEnd = {
+                    if (total < -SWIPE_PX) onNext() else if (total > SWIPE_PX) onPrevious()
+                },
+            ) { _, dx -> total += dx }
+        },
+    ) {
+        if (shown != null) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(File(current.file)).crossfade(400).build(),
-                contentDescription = current.candidate.title,
+                model = ImageRequest.Builder(context).data(File(shown.file)).crossfade(300).build(),
+                contentDescription = shown.candidate.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -119,8 +152,8 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                 .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent))),
         )
         Box(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(420.dp)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(480.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f)))),
         )
 
         Row(
@@ -146,7 +179,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
 
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
         ) {
             if (!settings.onboarded) {
                 Onboarding(unrestricted, busy, onAllow = { Power.requestUnrestricted(context) }, onStart = vm::startOnboarding)
@@ -157,7 +190,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     onClick = { onNavigate(Screen.SETTINGS) },
                     shape = RoundedCornerShape(50),
                     color = Color(0xCC5A3B00),
-                    modifier = Modifier.padding(bottom = 14.dp),
+                    modifier = Modifier.padding(bottom = 12.dp),
                 ) {
                     Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Warning, null, tint = Color(0xFFFFD58A), modifier = Modifier.size(18.dp))
@@ -166,72 +199,102 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     }
                 }
             }
-            if (current != null) {
+
+            if (shown != null) {
+                Surface(
+                    onClick = vm::showCurrent,
+                    enabled = !isCurrent,
+                    shape = RoundedCornerShape(50),
+                    color = if (isCurrent) Color.White.copy(alpha = 0.16f) else Color(0xCC2D5DA8),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                ) {
+                    Text(
+                        if (isCurrent) position else "$position  ·  към сегашния",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    )
+                }
                 Text(
-                    current.candidate.title,
+                    shown.candidate.title,
                     color = Color.White,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val subtitle = current.candidate.location.ifBlank { current.candidate.description }
-                if (subtitle.isNotBlank() && subtitle != current.candidate.title) {
+                val subtitle = shown.candidate.location.ifBlank { shown.candidate.description }
+                if (subtitle.isNotBlank() && subtitle != shown.candidate.title) {
                     Text(
                         subtitle,
                         color = Color.White.copy(alpha = 0.85f),
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
                 Text(
-                    listOf(SourceRegistry.name(current.candidate.sourceId), current.candidate.author)
+                    listOf(SourceRegistry.name(shown.candidate.sourceId), shown.candidate.author)
                         .filter { it.isNotBlank() }.joinToString(" · "),
                     color = Color.White.copy(alpha = 0.65f),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 6.dp),
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             } else {
                 Text(
-                    if (busy) "Изтеглям първата снимка…" else "Още няма тапет. Натисни „Следваща“.",
+                    if (busy || loadingMore) "Изтеглям снимки…" else "Още няма тапет. Натисни „Следваща“.",
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
-            Spacer(Modifier.height(16.dp))
+
+            Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val isFavorite = current != null && st.isFavorite(current.key)
+                val isFavorite = shown != null && st.isFavorite(shown.key)
                 RoundAction(
                     if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     if (isFavorite) "Махни от любими" else "Добави в любими",
-                    enabled = current != null,
+                    enabled = shown != null,
                     tint = if (isFavorite) Color(0xFFFF6B81) else Color.White,
-                ) { current?.let { vm.toggleFavorite(it.key) } }
-                RoundAction(Icons.Filled.Block, "Не показвай повече", enabled = current != null && !busy) {
-                    current?.let { vm.block(it.key) }
+                ) { shown?.let { vm.toggleFavorite(it.key) } }
+                RoundAction(Icons.Filled.Block, "Не показвай повече", enabled = shown != null && !busy) {
+                    shown?.let { vm.block(it.key) }
                 }
-                RoundAction(Icons.Filled.Info, "Информация за снимката", enabled = current != null) { showInfo = true }
-                RoundAction(Icons.Filled.Download, "Запази в галерията", enabled = current != null) {
-                    current?.let { vm.save(it) }
+                RoundAction(Icons.Filled.Info, "Информация за снимката", enabled = shown != null) { showInfo = true }
+                RoundAction(Icons.Filled.Download, "Запази в галерията", enabled = shown != null) {
+                    shown?.let { vm.save(it) }
                 }
-                Spacer(Modifier.weight(1f))
-                Button(
-                    onClick = vm::next,
-                    enabled = !busy,
-                    modifier = Modifier.height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                ) {
-                    if (busy) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black)
-                    } else {
-                        Text("Следваща", style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.width(6.dp))
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NavButton("Предишна", Icons.AutoMirrored.Filled.ArrowBack, iconFirst = true, loading = false, modifier = Modifier.weight(1f), onClick = vm::showPrevious)
+                NavButton("Следваща", Icons.AutoMirrored.Filled.ArrowForward, iconFirst = false, loading = loadingMore, modifier = Modifier.weight(1f), onClick = vm::showNext)
+            }
+            Spacer(Modifier.height(10.dp))
+            Button(
+                onClick = vm::choose,
+                enabled = shown != null && !isCurrent && !busy,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    disabledContainerColor = Color.White.copy(alpha = 0.18f),
+                    disabledContentColor = Color.White.copy(alpha = 0.8f),
+                ),
+            ) {
+                when {
+                    busy -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black)
+                    isCurrent -> {
+                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Това е тапетът ти", maxLines = 1, softWrap = false, style = MaterialTheme.typography.titleSmall)
                     }
+                    else -> Text("Избери", maxLines = 1, softWrap = false, style = MaterialTheme.typography.titleMedium)
                 }
             }
             val next = remember(st.lastChangeAt, settings, resumeTick) { vm.nextPlanned() }
@@ -243,6 +306,8 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                 },
                 color = Color.White.copy(alpha = 0.6f),
                 style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 10.dp),
             )
         }
@@ -250,8 +315,43 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         SnackbarHost(snackbar, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp))
     }
 
-    if (showInfo && current != null) {
-        InfoSheet(current, onDismiss = { showInfo = false }, onSave = { vm.save(current) })
+    if (showInfo && shown != null) {
+        InfoSheet(shown, onDismiss = { showInfo = false }, onSave = { vm.save(shown) })
+    }
+}
+
+private const val SWIPE_PX = 120f
+
+/** "Предишна" / "Следваща": label on one line, never wrapped. */
+@Composable
+private fun NavButton(
+    label: String,
+    icon: ImageVector,
+    iconFirst: Boolean,
+    loading: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Black.copy(alpha = 0.3f), contentColor = Color.White),
+    ) {
+        if (iconFirst) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
+        if (!iconFirst) {
+            Spacer(Modifier.width(6.dp))
+            if (loading) {
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+            } else {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+        }
     }
 }
 
@@ -288,7 +388,7 @@ private fun Onboarding(unrestricted: Boolean, busy: Boolean, onAllow: () -> Unit
             Text("Добре дошъл!", style = MaterialTheme.typography.headlineSmall)
             Text(
                 "Всеки ден ще слагам нова снимка на началния екран – от Bing, Windows Spotlight, " +
-                    "Wikimedia и NASA. Ако не ти хареса, „Следваща“ я сменя веднага.",
+                    "Wikimedia и NASA. С „Предишна“ и „Следваща“ разглеждаш, а „Избери“ слага снимката за тапет.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
             )
