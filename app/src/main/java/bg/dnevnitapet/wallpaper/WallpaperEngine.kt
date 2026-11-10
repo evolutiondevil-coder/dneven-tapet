@@ -171,7 +171,7 @@ class WallpaperEngine(
         val shown = item.copy(shownAt = now)
         library.update { st ->
             val history = (listOfNotNull(st.current) + st.history)
-                .filter { it.key != shown.key }
+                .filter { it.key != shown.key && it.key !in st.blocked }
                 .take(HISTORY_SIZE)
             st.copy(
                 current = shown,

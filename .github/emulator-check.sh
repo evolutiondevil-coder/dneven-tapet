@@ -56,6 +56,33 @@ w2=$(wallpaper_state)
   if [ "$w1" != "$w2" ]; then echo "OK: Избери changed the wallpaper"; else echo "FAIL: Избери did not change the wallpaper"; fi
 } | tee -a "$OUT/summary.txt"
 
+# Swipe like in a gallery: the picture follows the finger; the wallpaper does not change.
+w3=$(wallpaper_state)
+adb shell input swipe 950 1000 100 1000 250
+shot 03g-after-swipe-left 3
+adb shell input swipe 100 1000 950 1000 250
+shot 03h-after-swipe-right 3
+adb shell input swipe 950 1000 450 1000 2500 &
+sleep 1.5
+adb exec-out screencap -p > "$OUT/03i-mid-swipe.png"
+wait
+sleep 2
+w4=$(wallpaper_state)
+if [ "$w3" = "$w4" ]; then echo "OK: swiping did not change the wallpaper"; else echo "FAIL: swiping changed the wallpaper"; fi | tee -a "$OUT/summary.txt"
+
+# Full screen: a tap on the picture hides everything, another tap brings it back.
+has_text() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+  adb pull /sdcard/ui.xml /tmp/ui.xml > /dev/null 2>&1
+  grep -q "text=\"$1\"" /tmp/ui.xml
+}
+adb shell input tap 540 900
+shot 03j-full-screen 2
+if has_text "Избери" || has_text "Това е тапетът ти"; then echo "FAIL: controls still visible in full screen"; else echo "OK: full screen hides the controls"; fi | tee -a "$OUT/summary.txt"
+adb shell input tap 540 900
+shot 03k-back-from-full-screen 2
+if has_text "Следваща"; then echo "OK: second tap brings the controls back"; else echo "FAIL: controls did not come back"; fi | tee -a "$OUT/summary.txt"
+
 # Narrow screen (360 dp) and bigger font: the buttons' labels must still fit on one line.
 adb shell wm density 480
 shot 03e-narrow-360dp 4

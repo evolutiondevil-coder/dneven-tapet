@@ -63,33 +63,37 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun browseList(st: LibraryState = library.value): List<StoredImage> =
         st.history.asReversed() + listOfNotNull(st.current) + st.queue
 
-    private fun shownIndex(list: List<StoredImage>): Int {
-        val st = library.value
-        val key = _previewKey.value ?: st.current?.key
-        return list.indexOfFirst { it.key == key }
+    /** The picture the user swiped to (the current wallpaper counts as "no preview"). */
+    fun setPreview(key: String) {
+        _previewKey.value = if (key == library.value.current?.key) null else key
     }
 
-    fun showNext() {
-        val list = browseList()
-        val i = shownIndex(list)
-        if (i + 1 < list.size) {
-            _previewKey.value = list[i + 1].key
-            return
-        }
+    fun showCurrent() {
+        _previewKey.value = null
+    }
+
+    /**
+     * The user reached the end of the prepared pictures: download one more and show it.
+     * New pictures are appended at the end, i.e. exactly where the user is looking.
+     */
+    fun loadMore() {
         if (_loadingMore.value) return
         viewModelScope.launch {
             _loadingMore.value = true
             try {
-                val wanted = (library.value.queue.size + 1).coerceAtMost(MAX_BROWSE_QUEUE)
+                val before = library.value.queue.map { it.key }.toSet()
+                val wanted = (before.size + 1).coerceAtMost(MAX_BROWSE_QUEUE)
                 runCatching { engine.refill(minQueue = wanted, budgetMs = 60_000L) }
-                val longer = browseList()
-                val j = shownIndex(longer)
-                if (j + 1 < longer.size) {
-                    _previewKey.value = longer[j + 1].key
+                val added = library.value.queue.firstOrNull { it.key !in before }
+                if (added != null) {
+                    _previewKey.value = added.key
                 } else {
                     say(
-                        if (settings.value.wifiOnly) "Няма повече готови снимки. Нови ще изтегля, когато има Wi-Fi."
-                        else "Няма повече готови снимки в момента. Опитай пак след малко.",
+                        when {
+                            before.size >= MAX_BROWSE_QUEUE -> "Стигна края – избери някоя от тези или се върни назад."
+                            settings.value.wifiOnly -> "Няма повече готови снимки. Нови ще изтегля, когато има Wi-Fi."
+                            else -> "Няма повече готови снимки в момента. Опитай пак след малко."
+                        },
                     )
                 }
             } finally {
@@ -98,20 +102,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun showPrevious() {
-        val list = browseList()
-        val i = shownIndex(list)
-        if (i > 0) _previewKey.value = list[i - 1].key else say("Това е най-старата снимка в историята")
-    }
-
-    fun showCurrent() {
-        _previewKey.value = null
-    }
-
-    /** "Избери": the previewed picture becomes the wallpaper. */
-    fun choose() {
-        val key = _previewKey.value ?: return
-        if (_busy.value) return
+    /** "Избери": the picture on screen becomes the wallpaper. */
+    fun choose(key: String) {
+        if (_busy.value || key == library.value.current?.key) return
         val st = library.value
         viewModelScope.launch {
             _busy.value = true
@@ -252,6 +245,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             is ChangeResult.Failed -> _messages.emit(UiMessage("Неуспешна смяна: ${r.message}"))
         }
     }
+
+    /** Short message at the top of the screen. */
+    fun hint(text: String) = say(text)
 
     private fun say(text: String) {
         _messages.tryEmit(UiMessage(text))
