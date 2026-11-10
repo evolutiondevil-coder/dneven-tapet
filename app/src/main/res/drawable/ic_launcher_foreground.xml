@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- sun -->
+    <path
+        android:fillColor="#FFFFE8A3"
+        android:pathData="M63,39m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0" />
+    <!-- far mountains -->
+    <path
+        android:fillColor="#FFA9C9EC"
+        android:pathData="M30,70 L46,48 L55,60 L61,53 L78,70 Z" />
+    <!-- near mountains -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M27,76 L42,57 L51,67 L58,60 L81,76 Z" />
+</vector>

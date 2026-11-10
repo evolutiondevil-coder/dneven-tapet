@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Дневен тапет</string>
+    <string name="widget_name">Следващ тапет</string>
+    <string name="widget_description">Сменя тапета с едно докосване</string>
+    <string name="tile_label">Следващ тапет</string>
+    <string name="widget_next">Следваща снимка</string>
+    <string name="widget_favorite">Любима</string>
+</resources>
