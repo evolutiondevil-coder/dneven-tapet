@@ -49,7 +49,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
@@ -89,9 +88,9 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
     val unrestricted = remember(tick) { Power.isUnrestricted(context) }
     val exact = remember(tick) { vm.canScheduleExact() }
-    val unusedPause by produceState<Boolean?>(initialValue = null, tick) {
-        val active = withContext(Dispatchers.IO) { Power.unusedAppPauseActive(context) }
-        value = active
+    var unusedPause by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(tick) {
+        unusedPause = withContext(Dispatchers.IO) { Power.unusedAppPauseActive(context) }
     }
     val cache = remember(tick, st.queue.size, st.history.size, st.favorites.size) { vm.cacheBytes() }
     var showTime by remember { mutableStateOf(false) }
