@@ -23,6 +23,8 @@ jobs:
           java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic # MIT-licensed caching, no extra terms of use
 
       - name: Unit tests (source parsers, cropping, schedule)
         run: ./gradlew --no-daemon testDebugUnitTest
@@ -67,7 +69,8 @@ jobs:
         run: |
           ./gradlew --no-daemon assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "DnevenTapet-${VERSION_NAME}.apk"
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "DnevenTapet-${VERSION_NAME}.apk" | grep -E "Signer #1 certificate (DN|SHA-256)"
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify --print-certs "DnevenTapet-${VERSION_NAME}.apk" | grep -E "Signer #1 certificate (DN|SHA-256)"
 
       - name: Upload APK
         if: github.event_name != 'pull_request'
@@ -96,6 +99,8 @@ jobs:
           java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic # MIT-licensed caching, no extra terms of use
 
       - name: Enable KVM
         run: |
