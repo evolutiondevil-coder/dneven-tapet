@@ -30,6 +30,18 @@ import java.time.LocalDate
 
 enum class Trigger { MANUAL, SCHEDULED }
 
+/** Short human-readable reason, including the root cause of wrapped errors. */
+internal fun describe(e: Throwable): String {
+    e.message?.takeIf { it.isNotBlank() && e.cause == null }?.let { return it }
+    val root = generateSequence(e) { it.cause }.last()
+    val rootMessage = root.message?.takeIf { it.isNotBlank() }
+    return when {
+        rootMessage != null && root !== e -> root.javaClass.simpleName + ": " + rootMessage.take(200)
+        rootMessage != null -> rootMessage.take(200)
+        else -> root.javaClass.simpleName
+    }
+}
+
 sealed class ChangeResult {
     data class Changed(val image: StoredImage) : ChangeResult()
     /** No prepared picture and no allowed internet connection: the old wallpaper stays. */
@@ -78,8 +90,8 @@ class WallpaperEngine(
                 setter.apply(File(item.file), settings.value.target)
             } catch (e: Exception) {
                 library.update { it.copy(queue = listOf(item) + it.queue) }
-                log("Грешка при смяна на тапета: ${e.message}")
-                return@withContext ChangeResult.Failed(e.message ?: "Грешка")
+                log("Грешка при смяна на тапета: ${describe(e)}")
+                return@withContext ChangeResult.Failed(describe(e))
             }
             val shown = commitShown(item, trigger)
             pingUnsplash(item.candidate)
@@ -101,7 +113,7 @@ class WallpaperEngine(
                 setter.apply(copy, settings.value.target)
             } catch (e: Exception) {
                 copy.delete()
-                return@withContext ChangeResult.Failed(e.message ?: "Грешка")
+                return@withContext ChangeResult.Failed(describe(e))
             }
             val shown = commitShown(image.copy(file = copy.path), Trigger.MANUAL)
             onChanged?.invoke()
@@ -224,7 +236,7 @@ class WallpaperEngine(
                             pool = st.pool.filter { it.key != candidate.key },
                             seen = (st.seen + candidate.key).takeLast(SEEN_LIMIT),
                             lastSourceUsed = candidate.sourceId,
-                            log = appendLog(st.log, "Пропусната снимка (${SourceRegistry.name(candidate.sourceId)}): ${e.message}"),
+                            log = appendLog(st.log, "Пропусната снимка (${SourceRegistry.name(candidate.sourceId)}): ${describe(e)}"),
                         )
                     }
                 }
@@ -322,8 +334,8 @@ class WallpaperEngine(
                         lastErrorAt = if (result.candidates.isEmpty()) now else old.lastErrorAt,
                     )
                 }.onFailure { e ->
-                    statuses[src.id] = old.copy(lastAttemptAt = now, lastErrorAt = now, lastError = e.message ?: e.javaClass.simpleName)
-                    log = appendLog(log, "${SourceRegistry.name(src.id)}: грешка – ${e.message ?: e.javaClass.simpleName}")
+                    statuses[src.id] = old.copy(lastAttemptAt = now, lastErrorAt = now, lastError = describe(e))
+                    log = appendLog(log, "${SourceRegistry.name(src.id)}: грешка – ${describe(e)}")
                 }
             }
             st.copy(pool = pool.takeLast(POOL_LIMIT), sourceStatus = statuses, cursors = cursors, log = log)

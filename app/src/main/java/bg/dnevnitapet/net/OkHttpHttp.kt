@@ -24,10 +24,11 @@ class OkHttpHttp(
             client.newCall(request(url, headers)).execute().use { response ->
                 if (!response.isSuccessful) throw HttpStatusException(response.code, url)
                 val body = response.body ?: throw IOException("Празен отговор")
+                // Content-Type is not trusted (the Spotlight CDN sends "text/plain" for JPEGs);
+                // the file is validated by decoding it. Only an HTML page (Wi-Fi login portal,
+                // error page) is rejected right away.
                 val type = body.contentType()
-                if (type != null && type.type != "image" && type.subtype != "octet-stream") {
-                    throw IOException("Не е снимка ($type)")
-                }
+                if (type != null && type.subtype == "html") throw IOException("Не е снимка ($type)")
                 if (body.contentLength() > maxBytes) throw IOException("Файлът е твърде голям")
                 dest.parentFile?.mkdirs()
                 val tmp = File(dest.path + ".part")

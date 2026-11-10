@@ -1,12 +1,16 @@
 package bg.dnevnitapet.sources
 
-/** Small text clean-up helpers shared by sources. */
+/**
+ * Small text clean-up helpers shared by sources.
+ * Note: Android uses ICU regular expressions, which are stricter than Java's: `{`, `}` and `]`
+ * must always be escaped, also inside character classes (`[^{}]` is an error on Android).
+ */
 object Text {
     private val tagRegex = Regex("<[^>]+>")
     private val spaceRegex = Regex("\\s+")
-    private val wikiLink = Regex("\\[\\[(?:[^|\\]]*\\|)?([^\\]]*)]]")
-    private val wikiExternal = Regex("\\[https?://\\S+\\s+([^\\]]*)]")
-    private val wikiTemplate = Regex("\\{\\{[^{}]*}}")
+    private val wikiLink = Regex("\\[\\[(?:[^|\\]]*\\|)?([^\\]]*)\\]\\]")
+    private val wikiExternal = Regex("\\[https?://\\S+\\s+([^\\]]*)\\]")
+    private val wikiTemplate = Regex("\\{\\{[^\\{\\}]*\\}\\}")
     private val numericEntity = Regex("&#(x?[0-9a-fA-F]+);")
 
     fun stripHtml(html: String): String {

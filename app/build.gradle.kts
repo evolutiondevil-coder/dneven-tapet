@@ -62,6 +62,9 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
+    // The recorded source answers are also parsed on the emulator: Android's regex engine (ICU)
+    // and libraries differ from the JVM, and a parser must work on the phone, not only on a PC.
+    sourceSets.getByName("androidTest").resources.srcDir("src/test/resources")
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }

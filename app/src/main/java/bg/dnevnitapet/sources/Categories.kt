@@ -101,7 +101,7 @@ object CategoryClassifier {
         Category.NATURE to listOf("northern lights", "national park", "hot spring"),
     )
 
-    private val tokenRegex = Regex("[\\p{L}-]+")
+    private val tokenRegex = Regex("[\\p{L}\\-]+")
 
     fun classify(text: String): Category? {
         val lower = text.lowercase()
