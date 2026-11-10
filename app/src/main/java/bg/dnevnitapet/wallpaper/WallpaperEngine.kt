@@ -340,14 +340,19 @@ class WallpaperEngine(
 
     // ---------------------------------------------------------------- housekeeping
 
-    /** Deletes picture files nothing refers to any more. */
+    /**
+     * Deletes picture files nothing refers to any more. Files younger than a few minutes are kept:
+     * another operation (refill, favourite) may have just written one and not recorded it yet.
+     */
     private fun cleanupFiles() {
         val st = library.value
+        val now = clock()
+        fun old(f: File) = now - f.lastModified() > 10 * 60_000L
         val used = (st.queue + st.history + listOfNotNull(st.current)).map { File(it.file).name }.toSet()
-        imagesDir.listFiles()?.forEach { if (it.name !in used) it.delete() }
+        imagesDir.listFiles()?.forEach { if (it.name !in used && old(it)) it.delete() }
         val fav = st.favorites.map { File(it.file).name }.toSet()
-        favoritesDir.listFiles()?.forEach { if (it.name !in fav) it.delete() }
-        downloadsDir.listFiles()?.forEach { if (clock() - it.lastModified() > 3_600_000L) it.delete() }
+        favoritesDir.listFiles()?.forEach { if (it.name !in fav && old(it)) it.delete() }
+        downloadsDir.listFiles()?.forEach { if (now - it.lastModified() > 3_600_000L) it.delete() }
     }
 
     fun cacheBytes(): Long =
@@ -369,7 +374,7 @@ class WallpaperEngine(
         const val QUEUE_SIZE = 5
         const val HISTORY_SIZE = 30
         private const val SEEN_LIMIT = 5000
-        private const val POOL_LIMIT = 400
+        private const val POOL_LIMIT = 250
         private const val LOG_LIMIT = 80
         private const val FRESH_INTERVAL = 12 * 3_600_000L
         private const val MIN_FETCH_GAP = 10 * 60_000L
