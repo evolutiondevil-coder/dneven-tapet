@@ -198,8 +198,7 @@ private fun CropEditor(
         ) {
             Text("Нагласи изрязването", color = Color.White, style = MaterialTheme.typography.titleLarge)
             Text(
-                "Плъзни, за да преместиш. С два пръста – приближи.
-Двойно докосване – цялата снимка.",
+                "Плъзни, за да преместиш. С два пръста – приближи. Двойно докосване – цялата снимка.",
                 color = Color.White.copy(alpha = 0.8f),
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
