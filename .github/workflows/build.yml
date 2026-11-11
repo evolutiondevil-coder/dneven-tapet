@@ -92,7 +92,10 @@ jobs:
   emulator:
     name: Emulator check, Android ${{ matrix.api-level == 24 && '7.0' || '15' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 60
+    # Waits for the signed APK, so that the exact file people install is also tried on the emulator.
+    needs: apk
+    if: ${{ !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
@@ -114,6 +117,14 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+
+      - name: Get the signed release APK
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: apk
+          path: release-apk
 
       - name: Build test APKs
         run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest

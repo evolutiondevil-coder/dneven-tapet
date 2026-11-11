@@ -163,6 +163,28 @@ after_widget=$(wallpaper_state)
   echo "wallpaper after widget:  $after_widget"
 } | tee -a "$OUT/summary.txt"
 
+# The signed release APK (the file people install): set up and choose a picture.
+REL=$(ls release-apk/*.apk 2>/dev/null | head -n 1)
+if [ -n "$REL" ]; then
+  adb shell input keyevent KEYCODE_HOME
+  adb uninstall bg.dnevnitapet > /dev/null 2>&1
+  adb install "$REL"
+  adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
+  shot 20-release-welcome 5
+  r0=$(wallpaper_state)
+  tap "Започни" && shot 21-release-main 30
+  r1=$(wallpaper_state)
+  expect_changed "release APK: Започни set a wallpaper" "$r0" "$r1"
+  tap "Следваща" && shot 22-release-next 4
+  tap "Избери" && shot 23-release-chosen 6
+  r2=$(wallpaper_state)
+  expect_changed "release APK: Избери changed the wallpaper" "$r1" "$r2"
+  if has_text "Сегашният ти тапет"; then echo "OK: release APK shows the chosen picture as the wallpaper"; else echo "FAIL: release APK screen after Избери"; fi | tee -a "$OUT/summary.txt"
+  tap "Настройки" && shot 24-release-settings 3
+else
+  echo "SKIP: no release APK in this run" | tee -a "$OUT/summary.txt"
+fi
+
 adb logcat -d > "$OUT/logcat-full.txt" || true
 adb logcat -d -s DnevenTapet:I > "$OUT/app-log.txt" || true
 # Also print the key results into the job log (quicker to read than the big artifact).
