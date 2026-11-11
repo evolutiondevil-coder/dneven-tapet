@@ -9,6 +9,9 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -101,8 +104,11 @@ private fun CropEditor(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val boxW = constraints.maxWidth.toFloat()
         val boxH = constraints.maxHeight.toFloat()
-        val topSpace = with(density) { 110.dp.toPx() }
-        val bottomSpace = with(density) { 150.dp.toPx() }
+        // Room for the title and hint above the frame and the buttons below it, plus the system bars.
+        val statusTop = WindowInsets.statusBars.getTop(density).toFloat()
+        val navBottom = WindowInsets.navigationBars.getBottom(density).toFloat()
+        val topSpace = statusTop + with(density) { 120.dp.toPx() }
+        val bottomSpace = navBottom + with(density) { 150.dp.toPx() }
 
         // The frame has the phone screen's shape and fills the free space.
         val aspect = s.screenWidth.toFloat() / s.screenHeight
@@ -192,7 +198,8 @@ private fun CropEditor(
         ) {
             Text("Нагласи изрязването", color = Color.White, style = MaterialTheme.typography.titleLarge)
             Text(
-                "Плъзни снимката, за да я преместиш. С два пръста – приближи или отдалечи. Двукратно докосване – цялата снимка.",
+                "Плъзни, за да преместиш. С два пръста – приближи.
+Двойно докосване – цялата снимка.",
                 color = Color.White.copy(alpha = 0.8f),
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
