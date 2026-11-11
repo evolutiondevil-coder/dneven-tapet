@@ -102,7 +102,9 @@ import bg.dnevnitapet.sources.SourceRegistry
 import bg.dnevnitapet.util.Power
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.math.abs
 
@@ -150,13 +152,24 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         pageCount = { latestList.size + 1 },
     )
 
-    // ViewModel → pager: start-up, "към сегашния", after "Избери", a change made from the widget.
-    LaunchedEffect(desiredKey, list) {
-        val target = list.indexOfFirst { it.key == desiredKey }
-        bg.dnevnitapet.util.Diag.i("sync desired=$desiredKey target=$target page=${pagerState.currentPage} scrolling=${pagerState.isScrollInProgress} size=${list.size}")
-        if (target >= 0 && target != pagerState.currentPage && !pagerState.isScrollInProgress) {
-            if (abs(target - pagerState.currentPage) <= 3) pagerState.animateScrollToPage(target) else pagerState.scrollToPage(target)
-        }
+    // The gallery decides what is on screen. The app only moves it on explicit requests
+    // ("към сегашния", after "Избери", after setup, back after a while) – never in reaction to the
+    // gallery's own movement, which would make the two fight each other.
+    suspend fun scrollToKey(key: String) {
+        val target = withTimeoutOrNull(3_000) {
+            snapshotFlow { latestList.indexOfFirst { it.key == key } }.first { it >= 0 }
+        } ?: return
+        bg.dnevnitapet.util.Diag.i("scroll to $key: page ${pagerState.currentPage} -> $target")
+        if (target == pagerState.currentPage) return
+        if (abs(target - pagerState.currentPage) <= 3) pagerState.animateScrollToPage(target) else pagerState.scrollToPage(target)
+    }
+    LaunchedEffect(Unit) {
+        vm.scrollRequests.collect { key -> scrollToKey(key) }
+    }
+    // The wallpaper changed (widget, tile, automatic change) while nothing is being browsed.
+    LaunchedEffect(current?.key) {
+        val key = current?.key ?: return@LaunchedEffect
+        if (vm.previewKey.value == null) scrollToKey(key)
     }
     // Pager → ViewModel: the picture the user swiped to.
     LaunchedEffect(pagerState) {

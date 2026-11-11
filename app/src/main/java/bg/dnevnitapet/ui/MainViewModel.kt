@@ -39,6 +39,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _previewKey = MutableStateFlow<String?>(null)
     val previewKey: StateFlow<String?> = _previewKey.asStateFlow()
 
+    /** One-off requests to move the gallery to a picture (by key). */
+    private val _scrollRequests = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val scrollRequests: SharedFlow<String> = _scrollRequests
+
+    private fun scrollTo(key: String?) {
+        if (key != null) _scrollRequests.tryEmit(key)
+    }
+
     private val _loadingMore = MutableStateFlow(false)
     val loadingMore: StateFlow<Boolean> = _loadingMore.asStateFlow()
 
@@ -51,7 +59,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Called when the app comes to the foreground: catch up on a missed change, refill the queue. */
     fun onResume() {
         // Back after a while: start again from the current wallpaper.
-        if (pausedAt > 0 && System.currentTimeMillis() - pausedAt > 2 * 60_000L) _previewKey.value = null
+        if (pausedAt > 0 && System.currentTimeMillis() - pausedAt > 2 * 60_000L) {
+            _previewKey.value = null
+            scrollTo(library.value.current?.key)
+        }
         graph.appScope.launch { scheduler.runIfDue(allowDownload = false) }
     }
 
@@ -92,6 +103,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun showCurrent() {
         _previewKey.value = null
+        scrollTo(library.value.current?.key)
     }
 
     /**
@@ -141,6 +153,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 bg.dnevnitapet.util.Diag.i("choose result: $r")
                 if (r is ChangeResult.Changed) {
                     _previewKey.value = null
+                    scrollTo(r.image.key)
                     say("Тапетът е сменен")
                 } else {
                     report(r)
@@ -194,8 +207,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _busy.value = true
             try {
-                // While browsing, move on to the neighbouring picture (the blocked one disappears).
-                if (_previewKey.value == key) {
+                // The gallery then shows the neighbouring picture (the blocked one disappears).
+                if (key != library.value.current?.key) {
                     val list = browseList()
                     val i = list.indexOfFirst { it.key == key }
                     _previewKey.value = (list.getOrNull(i + 1) ?: list.getOrNull(i - 1))?.key
@@ -244,6 +257,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             // Show the wallpaper that is about to be set, not whatever page the gallery was on.
             _previewKey.value = null
             next()
+            scrollTo(library.value.current?.key)
         }
     }
 

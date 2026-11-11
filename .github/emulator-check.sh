@@ -165,5 +165,9 @@ after_widget=$(wallpaper_state)
 
 adb logcat -d > "$OUT/logcat-full.txt" || true
 adb logcat -d -s DnevenTapet:I > "$OUT/app-log.txt" || true
+# Also print the key results into the job log (quicker to read than the big artifact).
+echo "===== SUMMARY"; cat "$OUT/summary.txt" || true
+echo "===== TAPS"; cat "$OUT/taps.txt" || true
+echo "===== APP LOG (last lines)"; tail -n 120 "$OUT/app-log.txt" || true
 if grep -q "^FAIL" "$OUT/summary.txt"; then status=1; fi
 exit $status
