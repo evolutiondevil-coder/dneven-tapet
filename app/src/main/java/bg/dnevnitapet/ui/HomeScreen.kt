@@ -153,6 +153,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     // ViewModel → pager: start-up, "към сегашния", after "Избери", a change made from the widget.
     LaunchedEffect(desiredKey, list) {
         val target = list.indexOfFirst { it.key == desiredKey }
+        bg.dnevnitapet.util.Diag.i("sync desired=$desiredKey target=$target page=${pagerState.currentPage} scrolling=${pagerState.isScrollInProgress} size=${list.size}")
         if (target >= 0 && target != pagerState.currentPage && !pagerState.isScrollInProgress) {
             if (abs(target - pagerState.currentPage) <= 3) pagerState.animateScrollToPage(target) else pagerState.scrollToPage(target)
         }
@@ -353,6 +354,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         NavButton("Предишна", Icons.AutoMirrored.Filled.ArrowBack, iconFirst = true, loading = false, modifier = Modifier.weight(1f)) {
+                            bg.dnevnitapet.util.Diag.i("tap Предишна page=${pagerState.currentPage} size=${list.size}")
                             if (pagerState.currentPage > 0) {
                                 scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
                             } else {
@@ -360,6 +362,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                             }
                         }
                         NavButton("Следваща", Icons.AutoMirrored.Filled.ArrowForward, iconFirst = false, loading = loadingMore, modifier = Modifier.weight(1f)) {
+                            bg.dnevnitapet.util.Diag.i("tap Следваща page=${pagerState.currentPage} size=${list.size} scrolling=${pagerState.isScrollInProgress}")
                             if (pagerState.currentPage < list.size) {
                                 scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                             } else {
@@ -369,7 +372,10 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     }
                     Spacer(Modifier.height(10.dp))
                     Button(
-                        onClick = { shown?.let { vm.choose(it.key) } },
+                        onClick = {
+                            bg.dnevnitapet.util.Diag.i("tap Избери page=${pagerState.currentPage} shown=${shown?.key}")
+                            shown?.let { vm.choose(it.key) }
+                        },
                         enabled = shown != null && !isCurrent && !busy,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         colors = ButtonDefaults.buttonColors(

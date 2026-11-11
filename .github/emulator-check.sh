@@ -13,13 +13,20 @@ shot() { sleep "${2:-3}"; adb exec-out screencap -p > "$OUT/$1.png"; }
 
 # Taps the centre of the first UI element whose text or content-desc equals $1.
 tap() {
-  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
-  adb pull /sdcard/ui.xml /tmp/ui.xml > /dev/null 2>&1
-  local b
-  b=$(grep -oE "(text|content-desc)=\"$1\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" /tmp/ui.xml | head -n 1 |
-      sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/')
+  TAP_NAME="$1"
+  local b="" try
+  # uiautomator cannot read the screen while something animates: try a few times.
+  for try in 1 2 3 4; do
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
+    adb pull /sdcard/ui.xml /tmp/ui.xml > /dev/null 2>&1
+    b=$(grep -oE "(text|content-desc)=\"$1\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" /tmp/ui.xml | head -n 1 |
+        sed -E 's/.*bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]".*/\1 \2 \3 \4/')
+    [ -n "$b" ] && break
+    sleep 2
+  done
   if [ -z "$b" ]; then echo "tap: '$1' not found" | tee -a "$OUT/summary.txt"; return 1; fi
   set -- $b
+  echo "tap '$TAP_NAME' at $(( ($1 + $3) / 2 )),$(( ($2 + $4) / 2 )) bounds $*" >> "$OUT/taps.txt"
   adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
 }
 
@@ -157,5 +164,6 @@ after_widget=$(wallpaper_state)
 } | tee -a "$OUT/summary.txt"
 
 adb logcat -d > "$OUT/logcat-full.txt" || true
+adb logcat -d -s DnevenTapet:I > "$OUT/app-log.txt" || true
 if grep -q "^FAIL" "$OUT/summary.txt"; then status=1; fi
 exit $status

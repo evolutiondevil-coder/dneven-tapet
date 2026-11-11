@@ -65,6 +65,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The picture the user swiped to (the current wallpaper counts as "no preview"). */
     fun setPreview(key: String) {
+        bg.dnevnitapet.util.Diag.i("preview -> $key (current=${library.value.current?.key})")
         _previewKey.value = if (key == library.value.current?.key) null else key
         // Close to the end of the prepared pictures: get the next ones ready in the background,
         // so swiping on stays smooth.
@@ -126,6 +127,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** "Избери": the picture on screen becomes the wallpaper. */
     fun choose(key: String) {
+        bg.dnevnitapet.util.Diag.i("choose $key busy=${_busy.value} current=${library.value.current?.key} inQueue=${library.value.queue.any { it.key == key }}")
         if (_busy.value || key == library.value.current?.key) return
         val st = library.value
         viewModelScope.launch {
@@ -136,6 +138,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     else -> st.history.firstOrNull { it.key == key }?.let { engine.applyStored(it) }
                         ?: ChangeResult.Failed("Снимката вече не е в списъка")
                 }
+                bg.dnevnitapet.util.Diag.i("choose result: $r")
                 if (r is ChangeResult.Changed) {
                     _previewKey.value = null
                     say("Тапетът е сменен")
@@ -238,6 +241,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun startOnboarding() {
         viewModelScope.launch {
             graph.settings.update { it.copy(onboarded = true) }
+            // Show the wallpaper that is about to be set, not whatever page the gallery was on.
+            _previewKey.value = null
             next()
         }
     }
