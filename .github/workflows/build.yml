@@ -90,9 +90,13 @@ jobs:
           body_path: RELEASE_NOTES.md
 
   emulator:
-    name: Emulator check (wallpaper really changes)
+    name: Emulator check, Android ${{ matrix.api-level == 24 && '7.0' || '15' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [24, 35]
     steps:
       - uses: actions/checkout@v7
 
@@ -114,10 +118,10 @@ jobs:
       - name: Build test APKs
         run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
 
-      - name: Run on Android 15 emulator
+      - name: Run on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
           profile: pixel_6
@@ -129,6 +133,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: emulator-check
+          name: emulator-check-api${{ matrix.api-level }}
           path: emulator-out
           if-no-files-found: ignore

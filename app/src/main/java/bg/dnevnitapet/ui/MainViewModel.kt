@@ -66,6 +66,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** The picture the user swiped to (the current wallpaper counts as "no preview"). */
     fun setPreview(key: String) {
         _previewKey.value = if (key == library.value.current?.key) null else key
+        // Close to the end of the prepared pictures: get the next ones ready in the background,
+        // so swiping on stays smooth.
+        val queue = library.value.queue
+        val i = queue.indexOfFirst { it.key == key }
+        if (i >= 0 && i >= queue.size - PREFETCH_AHEAD && queue.size < MAX_BROWSE_QUEUE) prefetchAhead()
+    }
+
+    private var prefetching = false
+
+    private fun prefetchAhead() {
+        if (prefetching || _loadingMore.value) return
+        prefetching = true
+        engine.lastBrowseAt = System.currentTimeMillis()
+        viewModelScope.launch {
+            try {
+                val wanted = (library.value.queue.size + PREFETCH_AHEAD).coerceAtMost(MAX_BROWSE_QUEUE)
+                runCatching { engine.refill(minQueue = wanted, budgetMs = 90_000L, minFetchGapMs = 20_000L) }
+            } finally {
+                prefetching = false
+            }
+        }
     }
 
     fun showCurrent() {
@@ -78,12 +99,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun loadMore() {
         if (_loadingMore.value) return
+        engine.lastBrowseAt = System.currentTimeMillis()
         viewModelScope.launch {
             _loadingMore.value = true
             try {
                 val before = library.value.queue.map { it.key }.toSet()
                 val wanted = (before.size + 1).coerceAtMost(MAX_BROWSE_QUEUE)
-                runCatching { engine.refill(minQueue = wanted, budgetMs = 60_000L) }
+                runCatching { engine.refill(minQueue = wanted, budgetMs = 60_000L, minFetchGapMs = 20_000L) }
                 val added = library.value.queue.firstOrNull { it.key !in before }
                 if (added != null) {
                     _previewKey.value = added.key
@@ -253,8 +275,97 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _messages.tryEmit(UiMessage(text))
     }
 
+    fun galleryNeedsPermission(): Boolean = graph.gallery.needsPermission()
+
+    /** "Задръж": stops (or resumes) the automatic change, so a liked wallpaper stays. */
+    fun toggleHold() {
+        val holdNow = settings.value.autoChange
+        updateSettings { it.copy(autoChange = !holdNow) }
+        say(
+            if (holdNow) "Тапетът е задържан – няма да се сменя сам, докато не натиснеш „Пусни“."
+            else "Автоматичната смяна е пусната отново.",
+        )
+    }
+
+    // ---------------------------------------------------------------- crop editor
+
+    sealed class CropState {
+        data object Idle : CropState()
+        data object Loading : CropState()
+        data class Ready(
+            val image: StoredImage,
+            val source: bg.dnevnitapet.wallpaper.WallpaperEngine.EditSource,
+            val preview: android.graphics.Bitmap,
+            val sourceWidth: Int,
+            val sourceHeight: Int,
+            /** Where the current wallpaper was cut, if known for this source. */
+            val initial: bg.dnevnitapet.image.ImageProcessor.CropFraction?,
+            val screenWidth: Int,
+            val screenHeight: Int,
+        ) : CropState()
+        data class Error(val message: String) : CropState()
+    }
+
+    private val _crop = MutableStateFlow<CropState>(CropState.Idle)
+    val crop: StateFlow<CropState> = _crop.asStateFlow()
+
+    /** Opens the crop editor for [image]: downloads the uncut picture (or uses the wallpaper offline). */
+    fun openCrop(image: StoredImage) {
+        _crop.value = CropState.Loading
+        viewModelScope.launch {
+            try {
+                val source = engine.editSource(image)
+                val preview = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    bg.dnevnitapet.image.ImageProcessor().loadPreview(source.file, 2048)
+                }
+                val initial = when {
+                    !source.fullPicture -> null
+                    image.hasCrop && image.sourceUrl == source.url ->
+                        bg.dnevnitapet.image.ImageProcessor.CropFraction(image.cropLeft, image.cropTop, image.cropRight, image.cropBottom)
+                    else -> null
+                }
+                val (sw, sh) = bg.dnevnitapet.wallpaper.DeviceInfo.screenSize(getApplication())
+                _crop.value = CropState.Ready(image, source, preview.bitmap, preview.sourceWidth, preview.sourceHeight, initial, sw, sh)
+                if (!source.fullPicture) say("Няма връзка с източника – можеш само да приближиш в рамките на сегашния тапет.")
+            } catch (e: Exception) {
+                _crop.value = CropState.Error(e.message ?: "Снимката не може да се отвори")
+            }
+        }
+    }
+
+    /** Saves the new cut; the current wallpaper is updated right away. */
+    fun applyCrop(fraction: bg.dnevnitapet.image.ImageProcessor.CropFraction, onDone: () -> Unit) {
+        val ready = _crop.value as? CropState.Ready ?: return
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val r = engine.recrop(ready.image.key, ready.source, fraction)
+                if (r is ChangeResult.Changed) {
+                    say(
+                        if (library.value.current?.key == ready.image.key) "Тапетът е обновен с новото изрязване"
+                        else "Изрязването е запазено – натисни „Избери“, за да го сложиш",
+                    )
+                    closeCrop()
+                    onDone()
+                } else {
+                    report(r)
+                }
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    fun closeCrop() {
+        _crop.value = CropState.Idle
+    }
+
     companion object {
         /** Browsing ahead downloads more pictures, but keeps at most this many prepared. */
-        const val MAX_BROWSE_QUEUE = 15
+        const val MAX_BROWSE_QUEUE = 100
+
+        /** How many pictures ahead are prepared while browsing. */
+        private const val PREFETCH_AHEAD = 4
     }
 }

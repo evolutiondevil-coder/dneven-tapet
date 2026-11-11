@@ -15,22 +15,34 @@ object Schedule {
 
     fun isActive(s: Settings) = s.autoChange && s.onboarded
 
-    /** The most recent daily change time that is not in the future. */
-    fun lastDailySlot(nowMs: Long, minuteOfDay: Int, zone: ZoneId): Long {
-        val now = Instant.ofEpochMilli(nowMs).atZone(zone)
-        var slot = atMinute(now, minuteOfDay)
-        if (slot.isAfter(now)) slot = atMinute(now.minusDays(1), minuteOfDay)
-        return slot.toInstant().toEpochMilli()
+    /** The latest change time (hh:mm of [minuteOfDay]) that is not after [ms]. */
+    fun slotOnOrBefore(ms: Long, minuteOfDay: Int, zone: ZoneId): ZonedDateTime {
+        val t = Instant.ofEpochMilli(ms).atZone(zone)
+        var slot = atMinute(t, minuteOfDay)
+        if (slot.isAfter(t)) slot = atMinute(t.minusDays(1), minuteOfDay)
+        return slot
     }
 
+    /** Kept for callers that only need "today's (or yesterday's) slot". */
+    fun lastDailySlot(nowMs: Long, minuteOfDay: Int, zone: ZoneId): Long =
+        slotOnOrBefore(nowMs, minuteOfDay, zone).toInstant().toEpochMilli()
+
     /**
-     * @param lastChangeMs the last time the wallpaper changed, automatically or by hand.
-     * A missed change (phone off, app stopped by the system) stays due until it happens.
+     * Daily mode: the change after [lastChangeMs] is due at the N-th change time after it
+     * (N = every how many days). A manual change counts too, so a picture picked by hand stays
+     * until then. A missed change (phone off, app stopped) stays due until it happens.
      */
+    private fun dailyDueAt(lastChangeMs: Long, s: Settings, zone: ZoneId): Long {
+        val base = slotOnOrBefore(lastChangeMs, s.dailyMinuteOfDay, zone)
+        val due = atMinute(base.plusDays(s.everyDays.coerceIn(1, 365).toLong()), s.dailyMinuteOfDay)
+        return due.toInstant().toEpochMilli()
+    }
+
+    /** @param lastChangeMs the last time the wallpaper changed, automatically or by hand. */
     fun isDue(nowMs: Long, lastChangeMs: Long, s: Settings, zone: ZoneId = ZoneId.systemDefault()): Boolean {
         if (!isActive(s)) return false
         return when (s.frequency) {
-            FrequencyMode.DAILY -> lastChangeMs < lastDailySlot(nowMs, s.dailyMinuteOfDay, zone)
+            FrequencyMode.DAILY -> nowMs >= dailyDueAt(lastChangeMs, s, zone)
             FrequencyMode.INTERVAL -> nowMs - lastChangeMs >= s.intervalHours.coerceAtLeast(1) * HOUR - TOLERANCE
         }
     }
@@ -40,12 +52,7 @@ object Schedule {
         if (!isActive(s)) return null
         if (isDue(nowMs, lastChangeMs, s, zone)) return nowMs
         return when (s.frequency) {
-            FrequencyMode.DAILY -> {
-                val now = Instant.ofEpochMilli(nowMs).atZone(zone)
-                var slot = atMinute(now, s.dailyMinuteOfDay)
-                if (!slot.isAfter(now)) slot = atMinute(now.plusDays(1), s.dailyMinuteOfDay)
-                slot.toInstant().toEpochMilli()
-            }
+            FrequencyMode.DAILY -> dailyDueAt(lastChangeMs, s, zone)
             FrequencyMode.INTERVAL -> lastChangeMs + s.intervalHours.coerceAtLeast(1) * HOUR
         }
     }

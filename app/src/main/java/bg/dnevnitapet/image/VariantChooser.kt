@@ -55,6 +55,19 @@ object VariantChooser {
         return Choice(best.url, best, s)
     }
 
+    /**
+     * The rendition shown in the crop editor: as much of the picture as possible (for Bing and
+     * Spotlight the wide 3840 px one rather than the portrait one) but not a huge original.
+     */
+    fun editSource(variants: List<ImageVariant>): ImageVariant? {
+        val plain = variants.filter { !it.sizedTemplate }
+        if (plain.isEmpty()) return null
+        val known = plain.filter { it.width > 0 && it.height > 0 }
+        if (known.isEmpty()) return plain.first()
+        val reasonable = known.filter { max(it.width, it.height) <= 4100 }
+        return reasonable.ifEmpty { known }.maxBy { pixels(it) }
+    }
+
     private fun pixels(v: ImageVariant): Long =
         if (v.width <= 0 || v.height <= 0) Long.MAX_VALUE else v.width.toLong() * v.height
 }

@@ -87,6 +87,7 @@ class Scheduler(private val context: Context, private val engine: WallpaperEngin
      * waits for the background refill instead.
      */
     suspend fun runIfDue(allowDownload: Boolean): ChangeResult? {
+        engine.trimQueue()
         val now = System.currentTimeMillis()
         val result = if (Schedule.isDue(now, engine.library.value.lastChangeAt, engine.settings.value)) {
             engine.next(Trigger.SCHEDULED, allowDownload).also {

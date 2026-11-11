@@ -67,4 +67,29 @@ class ScheduleTest {
         assertNull(Schedule.nextTrigger(now, 0, daily.copy(onboarded = false), zone))
         assertFalse(Schedule.isDue(now, 0, daily.copy(onboarded = false), zone))
     }
+
+    @Test
+    fun `every 3 days counts from the last change`() {
+        val s = daily.copy(everyDays = 3)
+        val last = t("2026-11-10T05:00:30")
+        assertFalse(Schedule.isDue(t("2026-11-12T09:00:00"), last, s, zone))
+        assertTrue(Schedule.isDue(t("2026-11-13T05:00:00"), last, s, zone))
+        assertEquals(t("2026-11-13T05:00:00"), Schedule.nextTrigger(t("2026-11-11T12:00:00"), last, s, zone))
+    }
+
+    @Test
+    fun `a picture chosen by hand stays the whole period`() {
+        // Chosen at 20:00; with "every 7 days" the next automatic change is a week later at 05:00.
+        val s = daily.copy(everyDays = 7)
+        val chosen = t("2026-11-10T20:00:00")
+        assertEquals(t("2026-11-17T05:00:00"), Schedule.nextTrigger(t("2026-11-11T08:00:00"), chosen, s, zone))
+        assertFalse(Schedule.isDue(t("2026-11-16T23:59:00"), chosen, s, zone))
+    }
+
+    @Test
+    fun `holding the wallpaper stops all automatic changes`() {
+        val held = daily.copy(autoChange = false)
+        assertFalse(Schedule.isDue(t("2026-12-31T05:00:00"), t("2026-11-01T05:00:00"), held, zone))
+        assertNull(Schedule.nextTrigger(t("2026-12-31T05:00:00"), t("2026-11-01T05:00:00"), held, zone))
+    }
 }

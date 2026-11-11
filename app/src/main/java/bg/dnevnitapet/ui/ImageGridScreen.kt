@@ -59,6 +59,7 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     var selected by remember { mutableStateOf<StoredImage?>(null) }
     var info by remember { mutableStateOf<StoredImage?>(null) }
+    val saveToGallery = rememberGallerySave(vm)
 
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
 
@@ -115,7 +116,7 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit) {
                         TextButton(onClick = { vm.toggleFavorite(image.key); if (favorites) selected = null }) {
                             Text(if (isFavorite) "Махни от любими" else "В любими")
                         }
-                        TextButton(onClick = { vm.save(image) }) { Text("Запази") }
+                        TextButton(onClick = { saveToGallery(image) }) { Text("Запази") }
                         TextButton(onClick = { info = image; selected = null }) { Text("Инфо") }
                     }
                 }
@@ -126,7 +127,7 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { selected = null }) { Text("Затвори") } },
         )
     }
-    info?.let { image -> InfoSheet(image, onDismiss = { info = null }, onSave = { vm.save(image) }) }
+    info?.let { image -> InfoSheet(image, onDismiss = { info = null }, onSave = { saveToGallery(image) }) }
 }
 
 @Composable

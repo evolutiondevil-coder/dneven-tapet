@@ -52,4 +52,19 @@ class VariantChooserTest {
         // 1800 / 2340 → needs 1.3x; ask the server for the original resolution instead.
         assertEquals("u?w=831&h=1800", VariantChooser.choose(listOf(v), 1080, 2340)!!.url)
     }
+
+    @Test
+    fun `crop editor gets the widest picture that is not huge`() {
+        // Bing: the 3840x2160 one, not the portrait 1080x1920 one.
+        assertEquals("uhd", VariantChooser.editSource(bing)!!.url)
+        // Wikimedia: the 3840 px thumbnail, not the 6231 px original.
+        val wiki = listOf(
+            ImageVariant("1920", 1920, 1280),
+            ImageVariant("3840", 3840, 2560),
+            ImageVariant("original", 6231, 4154),
+        )
+        assertEquals("3840", VariantChooser.editSource(wiki)!!.url)
+        // Only a server-cut rendition: nothing to edit from.
+        assertNull(VariantChooser.editSource(listOf(ImageVariant("u?w={w}&h={h}", 3000, 4000, sizedTemplate = true))))
+    }
 }

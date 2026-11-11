@@ -67,8 +67,15 @@ object UnsplashParser {
                 author = name,
                 copyright = if (name.isNotBlank()) "$name / Unsplash" else "Unsplash",
                 infoUrl = p.child("links").str("html").orEmpty(),
-                variants = listOf(
+                variants = listOfNotNull(
                     ImageVariant("$raw${sep}w={w}&h={h}&fit=crop&crop=faces,entropy&q=90&fm=jpg", width, height, sizedTemplate = true),
+                    // Uncut, 2400 px wide: used by the crop editor.
+                    if (width > 0 && height > 0) {
+                        val w = minOf(width, 2400)
+                        ImageVariant("$raw${sep}w=$w&q=90&fm=jpg", w, height * w / width)
+                    } else {
+                        null
+                    },
                 ),
                 fullUrl = p.child("urls").str("full") ?: raw,
                 category = category,

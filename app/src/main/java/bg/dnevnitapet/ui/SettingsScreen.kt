@@ -87,6 +87,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     }
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
     val unrestricted = remember(tick) { Power.isUnrestricted(context) }
+    val dataSaver = remember(tick) { Power.dataSaverBlocksBackground(context) }
     val exact = remember(tick) { vm.canScheduleExact() }
     var unusedPause by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(tick) {
@@ -108,7 +109,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
     ) { padding ->
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp)) {
             item {
-                SwitchRow("Автоматична смяна", "Сменя тапета сама по график", s.autoChange) { v -> update { it.copy(autoChange = v) } }
+                SwitchRow("Автоматична смяна", "Изключи, за да задържиш тапета, който ти харесва (бутонът „Задръж“ прави същото)", s.autoChange) { v -> update { it.copy(autoChange = v) } }
             }
 
             item { Header("Къде да се слага") }
@@ -118,7 +119,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     RadioRow("Заключен екран", s.target == WallpaperTarget.LOCK) { update { it.copy(target = WallpaperTarget.LOCK) } }
                     RadioRow("И двата", s.target == WallpaperTarget.BOTH) { update { it.copy(target = WallpaperTarget.BOTH) } }
                     if (s.target != WallpaperTarget.HOME) {
-                        Hint("Ако ползваш „Динамичен заключен екран“ на Samsung, той ще бъде заменен от тази снимка.")
+                        Hint("Ако телефонът ти сам сменя заключения екран (напр. „Динамичен заключен екран“ на Samsung или „Карусел“ на Xiaomi), той ще бъде заменен от тази снимка.")
                     }
                 }
             }
@@ -132,6 +133,17 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                             Text("В ", style = MaterialTheme.typography.bodyLarge)
                             OutlinedButton(onClick = { showTime = true }) { Text(Format.minuteOfDay(s.dailyMinuteOfDay)) }
                             Text("  часа", style = MaterialTheme.typography.bodyLarge)
+                        }
+                        Text("На всеки:", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 48.dp))
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(Modifier.padding(start = 48.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(1, 2, 3, 7, 14).forEach { d ->
+                                FilterChip(
+                                    selected = s.everyDays == d,
+                                    onClick = { update { it.copy(everyDays = d) } },
+                                    label = { Text(if (d == 1) "1 ден" else "$d дни") },
+                                )
+                            }
                         }
                     }
                     RadioRow("На всеки няколко часа", s.frequency == FrequencyMode.INTERVAL) { update { it.copy(frequency = FrequencyMode.INTERVAL) } }
@@ -152,8 +164,20 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
 
             item { Header("Интернет") }
             item {
-                SwitchRow("Само през Wi-Fi", "Снимките се теглят само по Wi-Fi. Готовите снимки работят и без интернет.", s.wifiOnly) { v ->
-                    update { it.copy(wifiOnly = v) }
+                Column(Modifier.padding(horizontal = 8.dp)) {
+                    RadioRow("Wi-Fi и мобилни данни", !s.wifiOnly) { update { it.copy(wifiOnly = false) } }
+                    RadioRow("Само Wi-Fi", s.wifiOnly) { update { it.copy(wifiOnly = true) } }
+                    Column(Modifier.padding(horizontal = 8.dp)) {
+                        Hint("Изтеглят се по 1–2 MB на снимка. Готовите снимки се сменят и без интернет.")
+                        if (dataSaver && !s.wifiOnly) {
+                            StatusRow(
+                                ok = false,
+                                title = "„Пестене на данни“ е включено",
+                                text = "Телефонът спира мобилните данни за приложенията на заден план. Разреши ги за Дневен тапет.",
+                                action = "Разреши" to { Power.openDataSaverSettings(context) },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -206,7 +230,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     StatusRow(
                         ok = unrestricted,
                         title = if (unrestricted) "Батерия: без ограничения" else "Батерия: оптимизирана",
-                        text = if (unrestricted) "Системата няма да спира смяната." else "Samsung може да спре приложението и да пропусне смяната.",
+                        text = if (unrestricted) "Системата няма да спира смяната." else "Телефонът може да спре приложението и да пропусне смяната.",
                         action = if (unrestricted) null else ("Разреши" to { Power.requestUnrestricted(context) }),
                     )
                     StatusRow(
@@ -224,7 +248,12 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
                             action = if (unusedPause == false) null else ("Изключи" to { Power.openUnusedAppSettings(context) }),
                         )
                     }
-                    SamsungSteps(onOpenBattery = { Power.openBatterySettings(context) }, onOpenApp = { Power.openAppDetails(context) })
+                    VendorSteps(
+                        onOpenBattery = { Power.openBatterySettings(context) },
+                        onOpenAutoStart = { if (!Power.openAutoStartSettings(context)) Power.openAppDetails(context) },
+                        onOpenApp = { Power.openAppDetails(context) },
+                        onMore = { Power.openUrl(context, "https://dontkillmyapp.com/") },
+                    )
                     Text("Състояние", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
                     Text(
                         "Последна смяна: ${Format.moment(st.lastChangeAt)}\n" +
@@ -420,28 +449,32 @@ private fun StatusRow(ok: Boolean, title: String, text: String, action: Pair<Str
 }
 
 @Composable
-private fun SamsungSteps(onOpenBattery: () -> Unit, onOpenApp: () -> Unit) {
+private fun VendorSteps(onOpenBattery: () -> Unit, onOpenAutoStart: () -> Unit, onOpenApp: () -> Unit, onMore: () -> Unit) {
+    val vendor = remember { Power.vendor() }
+    var showAll by remember { mutableStateOf(false) }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("За Samsung (One UI 6–8)", style = MaterialTheme.typography.titleSmall)
+            Text("За твоя телефон: ${vendor.label}", style = MaterialTheme.typography.titleSmall)
+            Text(Power.steps(vendor), style = MaterialTheme.typography.bodySmall)
             Text(
-                "1. Бутон „Разреши“ горе → „Разреши“. Това слага батерията на „Без ограничения“.\n" +
-                    "2. Настройки → Батерия → Ограничения за използване във фонов режим → " +
-                    "„Приложения, които никога не заспиват“ → + → Дневен тапет.\n" +
-                    "3. В същия екран можеш да изключиш „Приспиване на неизползвани приложения“.\n" +
-                    "4. Настройки → Приложения → Дневен тапет → изключи „Пауза на активността, ако не се използва“.\n" +
-                    "5. Не натискай „Принудително спиране“ за приложението – това спира и графика " +
-                    "(до следващото му отваряне).",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                "Имената на менютата може леко да се различават според версията на One UI.",
+                "Не натискай „Принудително спиране“ за приложението – това спира и графика до следващото му отваряне. " +
+                    "Имената на менютата се различават според марката и версията.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onOpenBattery) { Text("Настройки на батерията") }
+            @OptIn(ExperimentalLayoutApi::class)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onOpenBattery) { Text("Батерия") }
+                if (Power.hasAutoStartScreen()) OutlinedButton(onClick = onOpenAutoStart) { Text("Автоматично стартиране") }
                 TextButton(onClick = onOpenApp) { Text("За приложението") }
+            }
+            TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) "Скрий другите марки" else "Други марки телефони") }
+            if (showAll) {
+                Power.Vendor.entries.filter { it != vendor }.forEach { v ->
+                    Text(v.label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
+                    Text(Power.steps(v), style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = onMore) { Text("Още съвети: dontkillmyapp.com") }
             }
         }
     }

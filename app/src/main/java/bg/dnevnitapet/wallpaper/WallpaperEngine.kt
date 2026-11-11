@@ -225,6 +225,105 @@ class WallpaperEngine(
         library.update { it.copy(blocked = it.blocked - key) }
     }
 
+    /** Last time the user browsed ahead in the app; extra prepared pictures are kept meanwhile. */
+    @Volatile
+    var lastBrowseAt: Long = 0
+
+    /**
+     * Browsing can prepare up to 100 pictures. When the user has not browsed for a while, the
+     * extra ones beyond [QUEUE_SIZE] x 2 are removed to free space; they go back to the list of
+     * candidates (not "seen"), so they can still come later.
+     */
+    suspend fun trimQueue(idleMs: Long = 30 * 60_000L) {
+        if (clock() - lastBrowseAt < idleMs) return
+        val keep = QUEUE_SIZE * 2
+        if (library.value.queue.size <= keep) return
+        library.update { st ->
+            val extra = st.queue.drop(keep)
+            st.copy(
+                queue = st.queue.take(keep),
+                pool = (extra.map { it.candidate } + st.pool).distinctBy { it.key }.take(POOL_LIMIT),
+            )
+        }
+        cleanupFiles()
+    }
+
+    // ---------------------------------------------------------------- crop editor
+
+    /** A picture file for the crop editor plus the URL it came from ("" = the wallpaper file itself). */
+    class EditSource(val file: File, val url: String, val fullPicture: Boolean)
+
+    /**
+     * Gets the uncut picture for the crop editor (for Bing/Spotlight the wide 3840 px one).
+     * Without an allowed connection the wallpaper file itself is used: then one can only zoom in.
+     */
+    suspend fun editSource(image: StoredImage): EditSource = withContext(Dispatchers.IO) {
+        val variant = VariantChooser.editSource(image.candidate.variants)
+        if (variant != null && DeviceInfo.isNetworkAllowed(context, settings.value)) {
+            downloadsDir.mkdirs()
+            val file = File(downloadsDir, fileName(image.key) + ".edit")
+            try {
+                if (!file.exists() || file.length() == 0L) http.downloadImage(variant.url, file)
+                return@withContext EditSource(file, variant.url, fullPicture = true)
+            } catch (e: Exception) {
+                file.delete()
+                log("Нагласяне: оригиналът не се изтегли (${describe(e)}) – ползвам тапета")
+            }
+        }
+        EditSource(File(image.file), "", fullPicture = false)
+    }
+
+    /**
+     * Cuts [key]'s picture again with the user's [crop] (fractions of the edit source) and, if it is
+     * the current wallpaper, sets it right away.
+     */
+    suspend fun recrop(key: String, source: EditSource, crop: ImageProcessor.CropFraction): ChangeResult = changeMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val st = library.value
+            val image = (listOfNotNull(st.current) + st.queue + st.history + st.favorites).firstOrNull { it.key == key }
+                ?: return@withContext ChangeResult.Failed("Снимката вече не е в списъка")
+            val (tw, th) = DeviceInfo.screenSize(context)
+            imagesDir.mkdirs()
+            val dest = File(imagesDir, fileName(key) + "-" + clock() + ".jpg")
+            val out = try {
+                processor.process(source.file, dest, tw, th, composedForPortrait = false, manualCrop = crop)
+            } catch (e: Exception) {
+                dest.delete()
+                return@withContext ChangeResult.Failed(describe(e))
+            }
+            val isCurrent = st.current?.key == key
+            if (isCurrent) {
+                try {
+                    setter.apply(dest, settings.value.target)
+                } catch (e: Exception) {
+                    return@withContext ChangeResult.Failed(describe(e))
+                }
+            }
+            fun edited(old: StoredImage, file: String) = old.copy(
+                file = file, width = out.width, height = out.height,
+                sourceUrl = source.url.ifBlank { old.sourceUrl },
+                cropLeft = if (source.fullPicture) out.crop.left else old.cropLeft,
+                cropTop = if (source.fullPicture) out.crop.top else old.cropTop,
+                cropRight = if (source.fullPicture) out.crop.right else old.cropRight,
+                cropBottom = if (source.fullPicture) out.crop.bottom else old.cropBottom,
+                userCrop = true,
+            )
+            // A favourite keeps its own copy: update it too.
+            st.favorites.firstOrNull { it.key == key }?.let { fav -> dest.copyTo(File(fav.file), overwrite = true) }
+            library.update { s ->
+                s.copy(
+                    current = s.current?.let { if (it.key == key) edited(it, dest.path) else it },
+                    queue = s.queue.map { if (it.key == key) edited(it, dest.path) else it },
+                    history = s.history.map { if (it.key == key) edited(it, dest.path) else it },
+                    favorites = s.favorites.map { if (it.key == key) edited(it, it.file) else it },
+                    log = appendLog(s.log, "Ново изрязване: " + image.candidate.title),
+                )
+            }
+            if (isCurrent) onChanged?.invoke()
+            ChangeResult.Changed(edited(image, dest.path))
+        }
+    }
+
     suspend fun clearQueue() {
         library.update { it.copy(queue = emptyList()) }
         cleanupFiles()
@@ -236,19 +335,24 @@ class WallpaperEngine(
      * Downloads and prepares pictures until the queue holds [minQueue] of them.
      * @return number of pictures added.
      */
-    suspend fun refill(minQueue: Int = QUEUE_SIZE, budgetMs: Long = 8 * 60_000L): Int = refillMutex.withLock {
+    suspend fun refill(
+        minQueue: Int = QUEUE_SIZE,
+        budgetMs: Long = 8 * 60_000L,
+        minFetchGapMs: Long = MIN_FETCH_GAP,
+    ): Int = refillMutex.withLock {
         withContext(Dispatchers.IO) {
             val started = clock()
             var added = 0
             var attempts = 0
-            var fetchedThisRun = false
-            while (library.value.queue.size < minQueue && clock() - started < budgetMs && attempts < 30) {
+            var fetches = 0
+            while (library.value.queue.size < minQueue && clock() - started < budgetMs && attempts < minQueue + 30) {
                 if (!DeviceInfo.isNetworkAllowed(context, settings.value)) break
                 attempts++
                 var candidate = pickCandidate()
-                if (candidate == null && !fetchedThisRun) {
-                    fetchSources()
-                    fetchedThisRun = true
+                // Browsing far ahead can empty the pool several times: ask the sources again.
+                if (candidate == null && fetches < 4) {
+                    fetchSources(minFetchGapMs)
+                    fetches++
                     candidate = pickCandidate()
                 }
                 if (candidate == null) break
@@ -290,7 +394,11 @@ class WallpaperEngine(
             val dest = File(imagesDir, fileName(candidate.key) + ".jpg")
             val composed = choice.variant.portrait || choice.variant.sizedTemplate
             val out = processor.process(download, dest, tw, th, composed)
-            return StoredImage(candidate, dest.path, out.width, out.height, addedAt = clock())
+            return StoredImage(
+                candidate, dest.path, out.width, out.height, addedAt = clock(),
+                sourceUrl = choice.url,
+                cropLeft = out.crop.left, cropTop = out.crop.top, cropRight = out.crop.right, cropBottom = out.crop.bottom,
+            )
         } finally {
             download.delete()
         }
@@ -319,7 +427,7 @@ class WallpaperEngine(
     }
 
     /** Asks every enabled source that is running low for new pictures, all in parallel. */
-    suspend fun fetchSources() {
+    suspend fun fetchSources(minGapMs: Long = MIN_FETCH_GAP) {
         val s = settings.value
         val now = clock()
         val st0 = library.value
@@ -328,7 +436,7 @@ class WallpaperEngine(
             val status = st0.sourceStatus[src.id] ?: SourceStatus()
             val inPool = st0.pool.count { it.sourceId == src.id && eligible(it, st0, s) }
             val fresh = now - status.lastFreshFetchAt > FRESH_INTERVAL
-            (inPool < 3 || fresh) && now - status.lastAttemptAt > MIN_FETCH_GAP
+            (inPool < 3 || fresh) && now - status.lastAttemptAt > minGapMs
         }
         if (due.isEmpty()) return
         val results = coroutineScope {

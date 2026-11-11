@@ -52,8 +52,17 @@ data class StoredImage(
     val height: Int,
     val addedAt: Long,
     val shownAt: Long = 0,
+    /** The rendition the wallpaper was cut from and the cut, as fractions 0..1 of that picture. */
+    val sourceUrl: String = "",
+    val cropLeft: Float = 0f,
+    val cropTop: Float = 0f,
+    val cropRight: Float = 0f,
+    val cropBottom: Float = 0f,
+    /** True once the user adjusted the cut by hand. */
+    val userCrop: Boolean = false,
 ) {
     val key: String get() = candidate.key
+    val hasCrop: Boolean get() = cropRight > cropLeft && cropBottom > cropTop
 }
 
 @Serializable
@@ -106,6 +115,8 @@ data class Settings(
     val frequency: FrequencyMode = FrequencyMode.DAILY,
     /** Minutes after midnight for the daily change. */
     val dailyMinuteOfDay: Int = 5 * 60,
+    /** Change once every N days (1 = every day) at [dailyMinuteOfDay]. */
+    val everyDays: Int = 1,
     val intervalHours: Int = 6,
     val wifiOnly: Boolean = false,
     val enabledSources: Set<String> = setOf("bing", "spotlight", "wikimedia", "apod", "unsplash", "pexels"),

@@ -11,7 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
-enum class Screen { HOME, HISTORY, FAVORITES, SETTINGS }
+enum class Screen { HOME, HISTORY, FAVORITES, SETTINGS, CROP }
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
                     Screen.HISTORY -> ImageGridScreen(vm, favorites = false, onBack = { screen = Screen.HOME })
                     Screen.FAVORITES -> ImageGridScreen(vm, favorites = true, onBack = { screen = Screen.HOME })
                     Screen.SETTINGS -> SettingsScreen(vm, onBack = { screen = Screen.HOME })
+                    Screen.CROP -> CropScreen(vm, onClose = { screen = Screen.HOME })
                 }
             }
         }

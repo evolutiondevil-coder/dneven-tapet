@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 7.0 does not know the Let's Encrypt root certificates that Wikimedia, NASA and Pexels use
+  (they were added in Android 7.1.1 / 14). The two official ISRG roots are added here next to the
+  system ones; nothing else changes (cleartext stays forbidden).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

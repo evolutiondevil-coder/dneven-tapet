@@ -23,9 +23,26 @@ class ImageTooSmallException(message: String) : IOException(message)
  */
 class ImageProcessor {
 
-    data class Output(val width: Int, val height: Int)
+    /** A part of the upright source picture, as fractions 0..1 of its width and height. */
+    data class CropFraction(val left: Float, val top: Float, val right: Float, val bottom: Float)
 
-    fun process(src: File, dest: File, targetW: Int, targetH: Int, composedForPortrait: Boolean): Output {
+    data class Output(val width: Int, val height: Int, val crop: CropFraction)
+
+    /** Small upright copy of a picture for the crop editor, plus the source's real size. */
+    class Preview(val bitmap: Bitmap, val sourceWidth: Int, val sourceHeight: Int)
+
+    /**
+     * @param manualCrop the cut chosen by the user in the crop editor; null = automatic
+     * (centred for pictures already composed for portrait, "smart" for the others).
+     */
+    fun process(
+        src: File,
+        dest: File,
+        targetW: Int,
+        targetH: Int,
+        composedForPortrait: Boolean,
+        manualCrop: CropFraction? = null,
+    ): Output {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(src.path, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException("Файлът не е снимка")
@@ -33,16 +50,19 @@ class ImageProcessor {
         val rotation = exifRotation(src)
         val (w, h) = if (rotation == 90 || rotation == 270) bounds.outHeight to bounds.outWidth else bounds.outWidth to bounds.outHeight
         val aspect = targetW.toDouble() / targetH
-        val upscale = targetH / min(h.toDouble(), w / aspect)
-        if (upscale > VariantChooser.MAX_UPSCALE) {
-            throw ImageTooSmallException("Снимката е с твърде ниска резолюция (${w}x$h)")
+        if (manualCrop == null) {
+            val upscale = targetH / min(h.toDouble(), w / aspect)
+            if (upscale > VariantChooser.MAX_UPSCALE) {
+                throw ImageTooSmallException("Снимката е с твърде ниска резолюция (${w}x$h)")
+            }
         }
 
-        val bitmap = if (rotation == 0) {
-            processRegion(src, bounds.outWidth, bounds.outHeight, targetW, targetH, composedForPortrait)
-        } else {
-            processRotated(src, rotation, targetW, targetH, composedForPortrait)
+        val crop = when {
+            manualCrop != null -> fromFraction(manualCrop, w, h, aspect)
+            composedForPortrait -> SmartCrop.centreCrop(w, h, aspect)
+            else -> smartCrop(src, rotation, w, h, aspect)
         }
+        val bitmap = if (rotation == 0) decodeRegion(src, crop, targetW, targetH) else decodeRotated(src, rotation, crop, w, targetW, targetH)
         try {
             dest.parentFile?.mkdirs()
             val tmp = File(dest.path + ".tmp")
@@ -51,25 +71,53 @@ class ImageProcessor {
                 tmp.copyTo(dest, overwrite = true)
                 tmp.delete()
             }
-            return Output(bitmap.width, bitmap.height)
+            val fraction = CropFraction(
+                crop.left.toFloat() / w, crop.top.toFloat() / h,
+                crop.right.toFloat() / w, crop.bottom.toFloat() / h,
+            )
+            return Output(bitmap.width, bitmap.height, fraction)
         } finally {
             bitmap.recycle()
         }
     }
 
-    private fun processRegion(src: File, w: Int, h: Int, targetW: Int, targetH: Int, composed: Boolean): Bitmap {
-        val aspect = targetW.toDouble() / targetH
-        val crop = if (composed) {
-            SmartCrop.centreCrop(w, h, aspect)
-        } else {
-            val analysis = decodeSampled(src, ANALYSIS_SIDE) ?: throw IOException("Снимката не може да се декодира")
-            try {
-                cropFromAnalysis(analysis, w, h, aspect)
-            } finally {
-                analysis.recycle()
-            }
-        }
+    /** Upright, reduced copy for showing in the crop editor. */
+    fun loadPreview(src: File, maxSide: Int): Preview {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(src.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException("Файлът не е снимка")
+        val rotation = exifRotation(src)
+        val decoded = decodeSampled(src, maxSide) ?: throw IOException("Снимката не може да се декодира")
+        val upright = rotate(decoded, rotation)
+        val (w, h) = if (rotation == 90 || rotation == 270) bounds.outHeight to bounds.outWidth else bounds.outWidth to bounds.outHeight
+        return Preview(upright, w, h)
+    }
 
+    /** Turns fractions into a pixel rectangle with exactly the screen's aspect ratio, inside the picture. */
+    private fun fromFraction(c: CropFraction, w: Int, h: Int, aspect: Double): SmartCrop.Rect {
+        val cx = (c.left + c.right) / 2.0 * w
+        val cy = (c.top + c.bottom) / 2.0 * h
+        var ch = ((c.bottom - c.top) * h).toDouble().coerceAtLeast(16.0)
+        var cw = ch * aspect
+        if (cw > w) { cw = w.toDouble(); ch = cw / aspect }
+        if (ch > h) { ch = h.toDouble(); cw = ch * aspect }
+        val left = (cx - cw / 2).coerceIn(0.0, w - cw)
+        val top = (cy - ch / 2).coerceIn(0.0, h - ch)
+        return SmartCrop.Rect(left.roundToInt(), top.roundToInt(), cw.roundToInt().coerceAtMost(w), ch.roundToInt().coerceAtMost(h))
+    }
+
+    private fun smartCrop(src: File, rotation: Int, w: Int, h: Int, aspect: Double): SmartCrop.Rect {
+        val analysis = decodeSampled(src, ANALYSIS_SIDE) ?: throw IOException("Снимката не може да се декодира")
+        val upright = rotate(analysis, rotation)
+        try {
+            return cropFromAnalysis(upright, w, h, aspect)
+        } finally {
+            upright.recycle()
+        }
+    }
+
+    /** Decodes only the needed part of the file, so big originals never have to fit in memory. */
+    private fun decodeRegion(src: File, crop: SmartCrop.Rect, targetW: Int, targetH: Int): Bitmap {
         var sample = 1
         while (crop.height / (sample * 2) >= targetH && crop.width / (sample * 2) >= targetW) sample *= 2
 
@@ -93,26 +141,28 @@ class ImageProcessor {
         return scaleExactly(region, targetW, targetH)
     }
 
-    private fun processRotated(src: File, rotation: Int, targetW: Int, targetH: Int, composed: Boolean): Bitmap {
-        // Rare (camera originals with an EXIF rotation flag): decode the whole picture, a bit reduced.
-        val longest = max(targetW, targetH) * 2
-        val decoded = decodeSampled(src, longest) ?: throw IOException("Снимката не може да се декодира")
-        val rotated = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, Matrix().apply { postRotate(rotation.toFloat()) }, true)
-        if (rotated !== decoded) decoded.recycle()
-        val aspect = targetW.toDouble() / targetH
-        val crop = if (composed) {
-            SmartCrop.centreCrop(rotated.width, rotated.height, aspect)
-        } else {
-            val small = scaleToFit(rotated, ANALYSIS_SIDE)
-            try {
-                cropFromAnalysis(small, rotated.width, rotated.height, aspect)
-            } finally {
-                if (small !== rotated) small.recycle()
-            }
-        }
-        val cut = Bitmap.createBitmap(rotated, crop.left, crop.top, crop.width, crop.height)
-        if (cut !== rotated) rotated.recycle()
+    /** Rare case (camera originals with an EXIF rotation flag): decode reduced, rotate, then cut. */
+    private fun decodeRotated(src: File, rotation: Int, crop: SmartCrop.Rect, uprightW: Int, targetW: Int, targetH: Int): Bitmap {
+        var sample = 1
+        while (crop.height / (sample * 2) >= targetH && crop.width / (sample * 2) >= targetW) sample *= 2
+        val decoded = BitmapFactory.decodeFile(src.path, BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: throw IOException("Снимката не може да се декодира")
+        val upright = rotate(decoded, rotation)
+        val f = upright.width.toDouble() / uprightW
+        val left = (crop.left * f).roundToInt().coerceIn(0, upright.width - 1)
+        val top = (crop.top * f).roundToInt().coerceIn(0, upright.height - 1)
+        val cw = (crop.width * f).roundToInt().coerceIn(1, upright.width - left)
+        val ch = (crop.height * f).roundToInt().coerceIn(1, upright.height - top)
+        val cut = Bitmap.createBitmap(upright, left, top, cw, ch)
+        if (cut !== upright) upright.recycle()
         return scaleExactly(cut, targetW, targetH)
+    }
+
+    private fun rotate(bitmap: Bitmap, rotation: Int): Bitmap {
+        if (rotation == 0) return bitmap
+        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, Matrix().apply { postRotate(rotation.toFloat()) }, true)
+        if (rotated !== bitmap) bitmap.recycle()
+        return rotated
     }
 
     /** Runs [SmartCrop] on a small copy and maps the result back to full-size coordinates. */

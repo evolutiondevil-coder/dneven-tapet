@@ -38,10 +38,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -127,6 +130,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         onPauseOrDispose { }
     }
     val unrestricted = remember(resumeTick) { Power.isUnrestricted(context) }
+    val saveToGallery = rememberGallerySave(vm)
 
     LaunchedEffect(Unit) {
         vm.messages.collect { m ->
@@ -335,8 +339,14 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                             shown?.let { vm.block(it.key) }
                         }
                         RoundAction(Icons.Filled.Info, "Информация за снимката", enabled = shown != null) { showInfo = true }
+                        RoundAction(Icons.Filled.Crop, "Нагласи изрязването", enabled = shown != null && !busy) {
+                            shown?.let {
+                                vm.openCrop(it)
+                                onNavigate(Screen.CROP)
+                            }
+                        }
                         RoundAction(Icons.Filled.Download, "Запази в галерията", enabled = shown != null) {
-                            shown?.let { vm.save(it) }
+                            shown?.let { saveToGallery(it) }
                         }
                     }
 
@@ -380,18 +390,44 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                         }
                     }
                     val next = remember(st.lastChangeAt, settings, resumeTick) { vm.nextPlanned() }
-                    Text(
-                        buildString {
-                            append("Готови снимки: ${st.queue.size}")
-                            if (next != null) append(" · следваща смяна: " + Format.moment(next))
-                            else if (!settings.autoChange) append(" · автоматичната смяна е изключена")
-                        },
-                        color = Color.White.copy(alpha = 0.6f),
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 10.dp),
-                    )
+                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            when {
+                                !settings.autoChange -> "Тапетът е задържан – не се сменя сам"
+                                next != null -> "Следваща смяна: " + Format.moment(next)
+                                else -> "Готови снимки: ${st.queue.size}"
+                            },
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // "Задръж": keep the wallpaper you like; the automatic change pauses.
+                        Surface(
+                            onClick = vm::toggleHold,
+                            shape = RoundedCornerShape(50),
+                            color = if (settings.autoChange) Color.Black.copy(alpha = 0.38f) else Color(0xCC2D5DA8),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
+                        ) {
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (settings.autoChange) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (settings.autoChange) "Задръж" else "Пусни",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -400,7 +436,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     }
 
     if (showInfo && shown != null) {
-        InfoSheet(shown, onDismiss = { showInfo = false }, onSave = { vm.save(shown) })
+        InfoSheet(shown, onDismiss = { showInfo = false }, onSave = { saveToGallery(shown) })
     }
 }
 
@@ -516,7 +552,7 @@ private fun Onboarding(unrestricted: Boolean, busy: Boolean, onAllow: () -> Unit
             )
             Text("1. Разреши работа на заден план", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Иначе Samsung може да „приспи“ приложението и да пропусне смяната.",
+                "Иначе телефонът може да „приспи“ приложението и да пропусне смяната.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(vertical = 4.dp),
             )
