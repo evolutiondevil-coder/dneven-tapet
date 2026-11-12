@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Button
@@ -97,9 +98,11 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import bg.dnevnitapet.model.PhotoMode
 import bg.dnevnitapet.model.StoredImage
 import bg.dnevnitapet.sources.SourceRegistry
 import bg.dnevnitapet.util.Power
+import bg.dnevnitapet.wallpaper.MyPhotos
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.flow.first
@@ -142,7 +145,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     }
 
     val current = st.current
-    val list = remember(st.history, st.current, st.queue) { vm.browseList(st) }
+    val list = remember(st, settings.photoMode) { vm.browseList(st, settings) }
     val latestList by rememberUpdatedState(list)
     val onboarded by rememberUpdatedState(settings.onboarded)
     val desiredKey = previewKey ?: current?.key
@@ -197,12 +200,16 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val page = pagerState.currentPage
     val shown: StoredImage? = list.getOrNull(page)
     val isCurrent = shown != null && shown.key == current?.key
-    val queueIndex = shown?.let { s -> st.queue.indexOfFirst { it.key == s.key } } ?: -1
+    val shownIsMine = MyPhotos.isMine(shown?.key)
+    // Pages after the current wallpaper are the upcoming ones; before it, the history.
+    val currentIndex = list.indexOfFirst { it.key == current?.key }
+    val historyCount = st.history.size
+    val upcomingNumber = page - (if (currentIndex >= 0) currentIndex else historyCount - 1)
     val position = when {
         shown == null -> ""
-        isCurrent -> "Сегашният ти тапет"
-        queueIndex >= 0 -> "Предстояща ${queueIndex + 1} от ${st.queue.size}"
-        else -> "От историята · " + Format.moment(shown.shownAt)
+        isCurrent -> if (shownIsMine) "Сегашният ти тапет · моя снимка" else "Сегашният ти тапет"
+        page < historyCount -> "От историята · " + Format.moment(shown.shownAt)
+        else -> "Предстояща $upcomingNumber" + if (shownIsMine) " · моя снимка" else ""
     }
 
     Box(Modifier.fillMaxSize().background(Color(0xFF101418))) {
@@ -227,7 +234,9 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     loading = loadingMore || busy,
                     onboarded = settings.onboarded,
                     empty = latestList.isEmpty(),
+                    onlyMine = settings.photoMode == PhotoMode.MINE,
                     onRetry = vm::loadMore,
+                    onAddPhotos = { onNavigate(Screen.MY_PHOTOS) },
                 )
             }
         }
@@ -256,6 +265,9 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     )
                     IconButton(onClick = { onNavigate(Screen.HISTORY) }) {
                         Icon(Icons.Filled.History, contentDescription = "История", tint = Color.White)
+                    }
+                    IconButton(onClick = { onNavigate(Screen.MY_PHOTOS) }) {
+                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Моите снимки", tint = Color.White)
                     }
                     IconButton(onClick = { onNavigate(Screen.FAVORITES) }) {
                         Icon(Icons.Outlined.PhotoLibrary, contentDescription = "Любими", tint = Color.White)
@@ -359,7 +371,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                 onNavigate(Screen.CROP)
                             }
                         }
-                        RoundAction(Icons.Filled.Download, "Запази в галерията", enabled = shown != null) {
+                        RoundAction(Icons.Filled.Download, "Запази в галерията", enabled = shown != null && !shownIsMine) {
                             shown?.let { saveToGallery(it) }
                         }
                     }
@@ -461,7 +473,14 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
 
 /** The page after the last prepared picture: shows the download progress or "no more". */
 @Composable
-private fun EndPage(loading: Boolean, onboarded: Boolean, empty: Boolean, onRetry: () -> Unit) {
+private fun EndPage(
+    loading: Boolean,
+    onboarded: Boolean,
+    empty: Boolean,
+    onlyMine: Boolean,
+    onRetry: () -> Unit,
+    onAddPhotos: () -> Unit,
+) {
     Box(
         Modifier.fillMaxSize().background(
             Brush.verticalGradient(listOf(Color(0xFF1B2A41), Color(0xFF324A5F), Color(0xFF0C1821))),
@@ -474,6 +493,19 @@ private fun EndPage(loading: Boolean, onboarded: Boolean, empty: Boolean, onRetr
                 CircularProgressIndicator(color = Color.White)
                 Spacer(Modifier.height(16.dp))
                 Text("Изтеглям още снимки…", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            } else if (onboarded && onlyMine) {
+                Text(
+                    if (empty) "Още нямаш добавени снимки." else "Това са всичките ти снимки.\nПлъзни назад или добави още.",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = onAddPhotos,
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                ) { Text("Добави снимки") }
             } else if (onboarded) {
                 Text(
                     "Няма повече готови снимки.\nПлъзни назад или опитай пак.",
@@ -609,7 +641,7 @@ fun InfoSheet(image: StoredImage, onDismiss: () -> Unit, onSave: () -> Unit) {
             if (c.copyright.isNotBlank() && c.copyright.removePrefix("©").trim() != c.author) InfoLine("Права", c.copyright)
             InfoLine("Източник", SourceRegistry.name(c.sourceId) + if (c.date.isNotBlank()) " · " + Format.date(c.date) else "")
             InfoLine("Размер", "${image.width} × ${image.height}")
-            Text(
+            if (c.sourceId != MyPhotos.SOURCE_ID) Text(
                 "Снимката е собственост на автора си. Използва се само като личен тапет.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

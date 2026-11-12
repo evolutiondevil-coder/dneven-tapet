@@ -97,6 +97,10 @@ data class LibraryState(
     val lastChangeAt: Long = 0,
     val lastSourceUsed: String = "",
     val log: List<LogEntry> = emptyList(),
+    /** The user's own photos picked from the phone's gallery (copied into the app, screen-sized). */
+    val myPhotos: List<StoredImage> = emptyList(),
+    /** Own photos still to come in the current round, in order (each round is shuffled). */
+    val myRotation: List<String> = emptyList(),
 ) {
     fun isFavorite(key: String) = favorites.any { it.key == key }
 }
@@ -107,10 +111,22 @@ enum class WallpaperTarget { HOME, LOCK, BOTH }
 @Serializable
 enum class FrequencyMode { DAILY, INTERVAL }
 
+/** Where the wallpapers come from. */
+@Serializable
+enum class PhotoMode {
+    /** Pictures from the internet sources (Bing, Spotlight, ...). */
+    ONLINE,
+    /** Only the user's own photos from the phone. */
+    MINE,
+    /** Own photos and internet pictures take turns. */
+    MIXED,
+}
+
 @Serializable
 data class Settings(
     val onboarded: Boolean = false,
     val autoChange: Boolean = true,
+    val photoMode: PhotoMode = PhotoMode.ONLINE,
     val target: WallpaperTarget = WallpaperTarget.HOME,
     val frequency: FrequencyMode = FrequencyMode.DAILY,
     /** Minutes after midnight for the daily change. */

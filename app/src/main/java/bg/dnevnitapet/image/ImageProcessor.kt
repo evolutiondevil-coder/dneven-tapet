@@ -42,6 +42,8 @@ class ImageProcessor {
         targetH: Int,
         composedForPortrait: Boolean,
         manualCrop: CropFraction? = null,
+        /** The user's own photos are used even when small (they chose them). */
+        allowUpscale: Boolean = false,
     ): Output {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(src.path, bounds)
@@ -50,7 +52,7 @@ class ImageProcessor {
         val rotation = exifRotation(src)
         val (w, h) = if (rotation == 90 || rotation == 270) bounds.outHeight to bounds.outWidth else bounds.outWidth to bounds.outHeight
         val aspect = targetW.toDouble() / targetH
-        if (manualCrop == null) {
+        if (manualCrop == null && !allowUpscale) {
             val upscale = targetH / min(h.toDouble(), w / aspect)
             if (upscale > VariantChooser.MAX_UPSCALE) {
                 throw ImageTooSmallException("Снимката е с твърде ниска резолюция (${w}x$h)")
@@ -78,6 +80,21 @@ class ImageProcessor {
             return Output(bitmap.width, bitmap.height, fraction)
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    /**
+     * Saves an upright copy of [src], reduced to at most [maxSide] px, as a JPEG (EXIF rotation applied).
+     * Used to keep the user's own photos inside the app.
+     */
+    fun saveUprightCopy(src: File, dest: File, maxSide: Int): Pair<Int, Int> {
+        val preview = loadPreview(src, maxSide)
+        try {
+            dest.parentFile?.mkdirs()
+            dest.outputStream().use { preview.bitmap.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+            return preview.bitmap.width to preview.bitmap.height
+        } finally {
+            preview.bitmap.recycle()
         }
     }
 

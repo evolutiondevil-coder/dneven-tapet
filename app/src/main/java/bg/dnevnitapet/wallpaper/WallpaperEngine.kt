@@ -7,6 +7,7 @@ import bg.dnevnitapet.image.VariantChooser
 import bg.dnevnitapet.model.Candidate
 import bg.dnevnitapet.model.LibraryState
 import bg.dnevnitapet.model.LogEntry
+import bg.dnevnitapet.model.PhotoMode
 import bg.dnevnitapet.model.Settings
 import bg.dnevnitapet.model.SourceStatus
 import bg.dnevnitapet.model.StoredImage
@@ -69,6 +70,8 @@ class WallpaperEngine(
     private val imagesDir = File(context.filesDir, "images")
     private val favoritesDir = File(context.filesDir, "favorites")
     private val downloadsDir = File(context.cacheDir, "downloads")
+    /** The user's own photos: "<id>.jpg" (screen-sized) and "<id>.src.jpg" (upright copy for re-cutting). */
+    private val mineDir = File(context.filesDir, "mine")
 
     /** Called after every wallpaper change (widget and tile refresh themselves). */
     var onChanged: (() -> Unit)? = null
@@ -77,6 +80,15 @@ class WallpaperEngine(
 
     suspend fun next(trigger: Trigger, allowDownload: Boolean = true): ChangeResult = changeMutex.withLock {
         withContext(Dispatchers.IO) {
+            val mode = settings.value.photoMode
+            val st0 = library.value
+            if (MyPhotos.useMineNext(mode, st0.current?.key, usableMine(st0).isNotEmpty())) {
+                nextMineLocked(trigger)?.let { return@withContext it }
+                if (mode == PhotoMode.MINE) {
+                    log("Няма добавени собствени снимки – тапетът остава същият")
+                    return@withContext ChangeResult.NoImage
+                }
+            }
             var item = takeFromQueue(preferFresh = trigger == Trigger.SCHEDULED)
             if (item == null && allowDownload && DeviceInfo.isNetworkAllowed(context, settings.value)) {
                 runCatching { withTimeout(60_000) { refill(minQueue = 1) } }
@@ -102,24 +114,136 @@ class WallpaperEngine(
 
     /** Sets a picture from the history or the favourites. */
     suspend fun applyStored(image: StoredImage): ChangeResult = changeMutex.withLock {
+        withContext(Dispatchers.IO) { applyCopyLocked(image, Trigger.MANUAL) }
+    }
+
+    /**
+     * Sets a copy of [image] as the wallpaper (history, favourites and own photos keep their own
+     * files; the current wallpaper gets a separate copy). Caller holds [changeMutex].
+     */
+    private suspend fun applyCopyLocked(image: StoredImage, trigger: Trigger): ChangeResult {
+        val src = File(image.file)
+        if (!src.exists()) return ChangeResult.Failed("Файлът на снимката липсва")
+        val copy = File(imagesDir, fileName(image.key) + "-" + clock() + ".jpg")
+        imagesDir.mkdirs()
+        src.copyTo(copy, overwrite = true)
+        try {
+            setter.apply(copy, settings.value.target)
+        } catch (e: Exception) {
+            copy.delete()
+            log("Грешка при смяна на тапета: ${describe(e)}")
+            return ChangeResult.Failed(describe(e))
+        }
+        val shown = commitShown(image.copy(file = copy.path), trigger)
+        onChanged?.invoke()
+        return ChangeResult.Changed(shown)
+    }
+
+    // ---------------------------------------------------------------- own photos
+
+    private fun usableMine(st: LibraryState) = st.myPhotos.filter { it.key !in st.blocked && File(it.file).exists() }
+
+    /** Own photos in the order they will come. */
+    fun upcomingMine(st: LibraryState = library.value): List<StoredImage> {
+        val album = usableMine(st)
+        val keys = MyPhotos.upcoming(album.map { it.key }, st.myRotation, st.current?.key)
+        return keys.mapNotNull { k -> album.firstOrNull { it.key == k } }
+    }
+
+    private suspend fun nextMineLocked(trigger: Trigger): ChangeResult? {
+        val st = library.value
+        val album = usableMine(st)
+        val (key, rest) = MyPhotos.nextKey(album.map { it.key }, st.myRotation, st.current?.key) ?: return null
+        val item = album.first { it.key == key }
+        val r = applyCopyLocked(item, trigger)
+        if (r is ChangeResult.Changed) library.update { it.copy(myRotation = rest) }
+        return r
+    }
+
+    /** "Избери" on one of the user's own photos. */
+    suspend fun chooseMine(key: String): ChangeResult = changeMutex.withLock {
         withContext(Dispatchers.IO) {
-            val src = File(image.file)
-            if (!src.exists()) return@withContext ChangeResult.Failed("Файлът на снимката липсва")
-            // Favourites keep their own copy; the current wallpaper gets a separate one.
-            val copy = File(imagesDir, fileName(image.key) + "-" + clock() + ".jpg")
-            imagesDir.mkdirs()
-            src.copyTo(copy, overwrite = true)
-            try {
-                setter.apply(copy, settings.value.target)
-            } catch (e: Exception) {
-                copy.delete()
-                return@withContext ChangeResult.Failed(describe(e))
-            }
-            val shown = commitShown(image.copy(file = copy.path), Trigger.MANUAL)
-            onChanged?.invoke()
-            ChangeResult.Changed(shown)
+            val item = library.value.myPhotos.firstOrNull { it.key == key }
+                ?: return@withContext ChangeResult.Failed("Снимката вече не е в „Моите снимки“")
+            val r = applyCopyLocked(item, Trigger.MANUAL)
+            if (r is ChangeResult.Changed) library.update { it.copy(myRotation = it.myRotation - key) }
+            r
         }
     }
+
+    data class ImportResult(val added: Int, val failed: Int, val skipped: Int)
+
+    /**
+     * Copies photos picked in the phone's gallery into the app: an upright copy (for re-cutting)
+     * and a screen-sized wallpaper cut "smartly". The originals in the gallery are not touched.
+     */
+    suspend fun importMine(
+        uris: List<android.net.Uri>,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): ImportResult = withContext(Dispatchers.IO) {
+        val room = (MyPhotos.MAX_PHOTOS - library.value.myPhotos.size).coerceAtLeast(0)
+        val todo = uris.take(room)
+        val (tw, th) = DeviceInfo.screenSize(context)
+        mineDir.mkdirs()
+        downloadsDir.mkdirs()
+        var added = 0
+        var failed = 0
+        todo.forEachIndexed { i, uri ->
+            onProgress(i, todo.size)
+            val id = java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+            val tmp = File(downloadsDir, "import-$id.tmp")
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                    ?: error("снимката не може да се прочете")
+                val taken = runCatching {
+                    androidx.exifinterface.media.ExifInterface(tmp).getAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL)
+                }.getOrNull()
+                val date = runCatching {
+                    LocalDate.parse(taken!!.take(10).replace(':', '-'))
+                }.getOrNull()
+                val src = File(mineDir, "$id.src.jpg")
+                processor.saveUprightCopy(tmp, src, MINE_SOURCE_SIDE)
+                val wall = File(mineDir, "$id.jpg")
+                val out = processor.process(src, wall, tw, th, composedForPortrait = false, allowUpscale = true)
+                val bg = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("bg"))
+                val candidate = Candidate(
+                    key = "${MyPhotos.SOURCE_ID}:$id",
+                    sourceId = MyPhotos.SOURCE_ID,
+                    title = "Моя снимка",
+                    description = date?.let { "Заснета на " + it.format(bg) }.orEmpty(),
+                    date = date?.toString().orEmpty(),
+                    variants = emptyList(),
+                )
+                val item = StoredImage(
+                    candidate, wall.path, out.width, out.height, addedAt = clock(),
+                    sourceUrl = "file:" + src.path,
+                    cropLeft = out.crop.left, cropTop = out.crop.top, cropRight = out.crop.right, cropBottom = out.crop.bottom,
+                )
+                library.update { st -> st.copy(myPhotos = st.myPhotos + item) }
+                added++
+            } catch (e: Exception) {
+                failed++
+                log("Моя снимка не се добави: ${describe(e)}")
+            } finally {
+                tmp.delete()
+            }
+        }
+        onProgress(todo.size, todo.size)
+        if (added > 0) log("Добавени собствени снимки: $added")
+        ImportResult(added, failed, skipped = uris.size - todo.size)
+    }
+
+    /** Removes an own photo from the app (the original in the gallery stays). */
+    suspend fun removeMine(key: String) {
+        val item = library.value.myPhotos.firstOrNull { it.key == key } ?: return
+        library.update { st -> st.copy(myPhotos = st.myPhotos.filter { it.key != key }, myRotation = st.myRotation - key) }
+        withContext(Dispatchers.IO) {
+            File(item.file).delete()
+            if (item.sourceUrl.startsWith("file:")) File(item.sourceUrl.removePrefix("file:")).delete()
+        }
+    }
+
+    fun myPhotosBytes(): Long = mineDir.listFiles()?.sumOf { it.length() } ?: 0L
 
     /**
      * "Избери": sets a prepared picture the user found while browsing with "Следваща".
@@ -196,7 +320,7 @@ class WallpaperEngine(
             File(existing.file).delete()
             return@withContext false
         }
-        val image = (listOfNotNull(st.current) + st.history + st.queue).firstOrNull { it.key == key }
+        val image = (listOfNotNull(st.current) + st.history + st.queue + st.myPhotos).firstOrNull { it.key == key }
             ?: return@withContext false
         val src = File(image.file)
         if (!src.exists()) return@withContext false
@@ -258,6 +382,10 @@ class WallpaperEngine(
      * Without an allowed connection the wallpaper file itself is used: then one can only zoom in.
      */
     suspend fun editSource(image: StoredImage): EditSource = withContext(Dispatchers.IO) {
+        if (image.sourceUrl.startsWith("file:")) {
+            val own = File(image.sourceUrl.removePrefix("file:"))
+            if (own.exists()) return@withContext EditSource(own, image.sourceUrl, fullPicture = true)
+        }
         val variant = VariantChooser.editSource(image.candidate.variants)
         if (variant != null && DeviceInfo.isNetworkAllowed(context, settings.value)) {
             downloadsDir.mkdirs()
@@ -280,7 +408,7 @@ class WallpaperEngine(
     suspend fun recrop(key: String, source: EditSource, crop: ImageProcessor.CropFraction): ChangeResult = changeMutex.withLock {
         withContext(Dispatchers.IO) {
             val st = library.value
-            val image = (listOfNotNull(st.current) + st.queue + st.history + st.favorites).firstOrNull { it.key == key }
+            val image = (listOfNotNull(st.current) + st.queue + st.history + st.favorites + st.myPhotos).firstOrNull { it.key == key }
                 ?: return@withContext ChangeResult.Failed("Снимката вече не е в списъка")
             val (tw, th) = DeviceInfo.screenSize(context)
             imagesDir.mkdirs()
@@ -308,14 +436,16 @@ class WallpaperEngine(
                 cropBottom = if (source.fullPicture) out.crop.bottom else old.cropBottom,
                 userCrop = true,
             )
-            // A favourite keeps its own copy: update it too.
+            // A favourite and an own photo keep their own copy: update them too.
             st.favorites.firstOrNull { it.key == key }?.let { fav -> dest.copyTo(File(fav.file), overwrite = true) }
+            st.myPhotos.firstOrNull { it.key == key }?.let { own -> dest.copyTo(File(own.file), overwrite = true) }
             library.update { s ->
                 s.copy(
                     current = s.current?.let { if (it.key == key) edited(it, dest.path) else it },
                     queue = s.queue.map { if (it.key == key) edited(it, dest.path) else it },
                     history = s.history.map { if (it.key == key) edited(it, dest.path) else it },
                     favorites = s.favorites.map { if (it.key == key) edited(it, it.file) else it },
+                    myPhotos = s.myPhotos.map { if (it.key == key) edited(it, it.file) else it },
                     log = appendLog(s.log, "Ново изрязване: " + image.candidate.title),
                 )
             }
@@ -341,6 +471,7 @@ class WallpaperEngine(
         minFetchGapMs: Long = MIN_FETCH_GAP,
     ): Int = refillMutex.withLock {
         withContext(Dispatchers.IO) {
+            if (settings.value.photoMode == PhotoMode.MINE) return@withContext 0
             val started = clock()
             var added = 0
             var attempts = 0
@@ -508,7 +639,7 @@ class WallpaperEngine(
     }
 
     fun cacheBytes(): Long =
-        listOf(imagesDir, favoritesDir).sumOf { dir -> dir.listFiles()?.sumOf { it.length() } ?: 0L }
+        listOf(imagesDir, favoritesDir, mineDir).sumOf { dir -> dir.listFiles()?.sumOf { it.length() } ?: 0L }
 
     suspend fun log(message: String) {
         library.update { it.copy(log = appendLog(it.log, message)) }
@@ -525,6 +656,8 @@ class WallpaperEngine(
         /** Prepared pictures kept ready: instant "Next", also offline. ~1.5 MB each. */
         const val QUEUE_SIZE = 5
         const val HISTORY_SIZE = 30
+        /** Longest side of the kept copy of an own photo (enough for re-cutting, small on disk). */
+        private const val MINE_SOURCE_SIDE = 2560
         private const val SEEN_LIMIT = 5000
         private const val POOL_LIMIT = 250
         private const val LOG_LIMIT = 80

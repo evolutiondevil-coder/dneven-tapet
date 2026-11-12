@@ -5,9 +5,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import bg.dnevnitapet.Graph
 import bg.dnevnitapet.model.LibraryState
+import bg.dnevnitapet.model.PhotoMode
 import bg.dnevnitapet.model.Settings
 import bg.dnevnitapet.model.StoredImage
 import bg.dnevnitapet.wallpaper.ChangeResult
+import bg.dnevnitapet.wallpaper.MyPhotos
 import bg.dnevnitapet.wallpaper.Trigger
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,9 +72,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         pausedAt = System.currentTimeMillis()
     }
 
-    /** Oldest history first, then the current wallpaper, then the prepared (upcoming) pictures. */
-    fun browseList(st: LibraryState = library.value): List<StoredImage> =
-        st.history.asReversed() + listOfNotNull(st.current) + st.queue
+    /**
+     * Oldest history first, then the current wallpaper, then the upcoming pictures in the order the
+     * changes will use them (internet pictures, own photos, or both taking turns).
+     */
+    fun browseList(st: LibraryState = library.value, s: Settings = settings.value): List<StoredImage> {
+        val upcoming = MyPhotos.upcomingMixed(s.photoMode, st.queue, engine.upcomingMine(st), MyPhotos.isMine(st.current?.key))
+        return st.history.asReversed() + listOfNotNull(st.current) + upcoming
+    }
 
     /** The picture the user swiped to (the current wallpaper counts as "no preview"). */
     fun setPreview(key: String) {
@@ -112,6 +119,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun loadMore() {
         if (_loadingMore.value) return
+        // Only own photos: nothing to download; the last page says so.
+        if (settings.value.photoMode == PhotoMode.MINE) return
         engine.lastBrowseAt = System.currentTimeMillis()
         viewModelScope.launch {
             _loadingMore.value = true
@@ -147,6 +156,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val r = when {
                     st.queue.any { it.key == key } -> engine.chooseFromQueue(key)
+                    st.myPhotos.any { it.key == key } -> engine.chooseMine(key)
                     else -> st.history.firstOrNull { it.key == key }?.let { engine.applyStored(it) }
                         ?: ChangeResult.Failed("Снимката вече не е в списъка")
                 }
@@ -224,7 +234,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun unblock(key: String) {
+    fun unblock(key: String) {
         viewModelScope.launch { engine.unblock(key) }
     }
 
@@ -242,6 +252,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val before = settings.value
             val after = graph.settings.update(transform)
             if (before.wifiOnly != after.wifiOnly || before.enabledSources != after.enabledSources ||
+                before.photoMode != after.photoMode ||
                 before.enabledCategories != after.enabledCategories ||
                 before.unsplashKey != after.unsplashKey || before.pexelsKey != after.pexelsKey
             ) {
@@ -279,8 +290,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             is ChangeResult.Changed -> Unit
             ChangeResult.NoImage -> _messages.emit(
                 UiMessage(
-                    if (settings.value.wifiOnly) "Няма готови снимки. Ще изтегля, когато има Wi-Fi."
-                    else "Няма готови снимки и интернет. Тапетът остава същият.",
+                    when {
+                        settings.value.photoMode == PhotoMode.MINE -> "Още нямаш добавени снимки. Добави ги от „Моите снимки“."
+                        settings.value.wifiOnly -> "Няма готови снимки. Ще изтегля, когато има Wi-Fi."
+                        else -> "Няма готови снимки и интернет. Тапетът остава същият."
+                    },
                 ),
             )
             is ChangeResult.Failed -> _messages.emit(UiMessage("Неуспешна смяна: ${r.message}"))
@@ -295,6 +309,68 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun galleryNeedsPermission(): Boolean = graph.gallery.needsPermission()
+
+    // ---------------------------------------------------------------- own photos
+
+    /** (done, total) while photos from the gallery are being added, else null. */
+    private val _importing = MutableStateFlow<Pair<Int, Int>?>(null)
+    val importing: StateFlow<Pair<Int, Int>?> = _importing.asStateFlow()
+
+    fun myPhotosBytes(): Long = engine.myPhotosBytes()
+
+    fun setPhotoMode(mode: PhotoMode) {
+        updateSettings { it.copy(photoMode = mode) }
+        if (mode != PhotoMode.ONLINE && library.value.myPhotos.isEmpty()) {
+            say("Добави снимки от телефона – бутон „Добави снимки“.")
+        }
+    }
+
+    fun addMyPhotos(uris: List<android.net.Uri>) {
+        if (uris.isEmpty() || _importing.value != null) return
+        viewModelScope.launch {
+            _importing.value = 0 to uris.size
+            try {
+                val r = engine.importMine(uris) { done, total -> _importing.value = done to total }
+                say(
+                    buildString {
+                        append(if (r.added == 1) "Добавена 1 снимка" else "Добавени ${r.added} снимки")
+                        if (r.failed > 0) append(", ${r.failed} не можаха да се отворят")
+                        if (r.skipped > 0) append(", ${r.skipped} над лимита от ${MyPhotos.MAX_PHOTOS}")
+                    },
+                )
+            } finally {
+                _importing.value = null
+            }
+        }
+    }
+
+    fun removeMine(key: String) {
+        viewModelScope.launch {
+            engine.removeMine(key)
+            say("Снимката е махната от приложението (в галерията си остава)")
+        }
+    }
+
+    /** "Сложи като тапет" on an own photo in the album. */
+    fun applyMine(key: String) {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val r = engine.chooseMine(key)
+                if (r is ChangeResult.Changed) {
+                    _previewKey.value = null
+                    scrollTo(r.image.key)
+                    say("Тапетът е сменен")
+                } else {
+                    report(r)
+                }
+                scheduler.reschedule()
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
 
     /** "Задръж": stops (or resumes) the automatic change, so a liked wallpaper stays. */
     fun toggleHold() {

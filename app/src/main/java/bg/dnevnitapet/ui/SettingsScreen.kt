@@ -75,7 +75,7 @@ import bg.dnevnitapet.util.Power
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
+fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> Unit) {
     val s by vm.settings.collectAsStateWithLifecycle()
     val st by vm.library.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -110,6 +110,16 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit) {
         LazyColumn(contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp)) {
             item {
                 SwitchRow("Автоматична смяна", "Изключи, за да задържиш тапета, който ти харесва (бутонът „Задръж“ прави същото)", s.autoChange) { v -> update { it.copy(autoChange = v) } }
+            }
+
+            item { Header("Какви снимки") }
+            item {
+                Column(Modifier.padding(horizontal = 16.dp)) {
+                    PhotoModeCard(s.photoMode, hasPhotos = st.myPhotos.isNotEmpty(), onSelect = vm::setPhotoMode)
+                    OutlinedButton(onClick = onOpenMyPhotos, modifier = Modifier.padding(top = 8.dp)) {
+                        Text("Моите снимки от телефона (${st.myPhotos.size})")
+                    }
+                }
             }
 
             item { Header("Къде да се слага") }

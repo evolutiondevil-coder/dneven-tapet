@@ -96,7 +96,8 @@ class Scheduler(private val context: Context, private val engine: WallpaperEngin
         } else {
             null
         }
-        if (engine.library.value.queue.size < WallpaperEngine.QUEUE_SIZE) enqueueRefill()
+        val onlyOwnPhotos = engine.settings.value.photoMode == bg.dnevnitapet.model.PhotoMode.MINE
+        if (!onlyOwnPhotos && engine.library.value.queue.size < WallpaperEngine.QUEUE_SIZE) enqueueRefill()
         reschedule()
         return result
     }

@@ -27,6 +27,7 @@ object SourceRegistry {
         "apod" -> "NASA APOD"
         "unsplash" -> "Unsplash"
         "pexels" -> "Pexels"
+        "mine" -> "Моите снимки"
         else -> id
     }
 }

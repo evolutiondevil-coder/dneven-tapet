@@ -105,6 +105,69 @@ class WallpaperChangeTest {
         assertNotEquals(after, wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM))
     }
 
+    /** A "photo from the gallery": coloured picture with a subject, as a JPEG file. */
+    private fun fakePhoto(name: String, w: Int, h: Int, color: Int): android.net.Uri {
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawColor(color)
+        canvas.drawCircle(w * 0.7f, h * 0.5f, h * 0.2f, android.graphics.Paint().apply { this.color = Color.YELLOW })
+        val f = File(context.cacheDir, name)
+        f.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        return android.net.Uri.fromFile(f)
+    }
+
+    @Test
+    fun c_ownPhotosRotateInsteadOfInternetPictures() = runBlocking {
+        val graph = Graph.get(context)
+        val engine = graph.engine
+        val wm = WallpaperManager.getInstance(context)
+        val (w, h) = DeviceInfo.screenSize(context)
+
+        // Two photos, one of them smaller than the screen (own photos are used anyway).
+        val result = engine.importMine(listOf(fakePhoto("p1.jpg", 3000, 2000, Color.BLUE), fakePhoto("p2.jpg", 800, 600, Color.GREEN)))
+        Log.i(TAG, "import: $result")
+        assertEquals(2, result.added)
+        val album = graph.library.value.myPhotos
+        assertEquals(2, album.size)
+        for (photo in album) {
+            val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(photo.file, o)
+            assertEquals(w, o.outWidth)
+            assertEquals(h, o.outHeight)
+            assertTrue(photo.sourceUrl.startsWith("file:"))
+        }
+
+        // "Моите снимки": both photos come, one after the other, no internet needed.
+        graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.MINE) }
+        val first = engine.next(Trigger.MANUAL, allowDownload = false)
+        val id1 = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
+        val second = engine.next(Trigger.MANUAL, allowDownload = false)
+        val id2 = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
+        Log.i(TAG, "own photos: $first / $second")
+        assertTrue(first is ChangeResult.Changed && (first as ChangeResult.Changed).image.key.startsWith("mine:"))
+        assertTrue(second is ChangeResult.Changed && (second as ChangeResult.Changed).image.key.startsWith("mine:"))
+        assertNotEquals((first as ChangeResult.Changed).image.key, (second as ChangeResult.Changed).image.key)
+        assertNotEquals(id1, id2)
+
+        // "Смесено": after an own photo comes an internet picture (prepared by the previous test).
+        graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.MIXED) }
+        val mixed = engine.next(Trigger.MANUAL, allowDownload = false)
+        Log.i(TAG, "mixed: $mixed")
+        if (graph.library.value.queue.isNotEmpty() || (mixed is ChangeResult.Changed && !mixed.image.key.startsWith("mine:"))) {
+            assertTrue(mixed is ChangeResult.Changed && !(mixed as ChangeResult.Changed).image.key.startsWith("mine:"))
+            val back = engine.next(Trigger.MANUAL, allowDownload = false)
+            assertTrue(back is ChangeResult.Changed && (back as ChangeResult.Changed).image.key.startsWith("mine:"))
+        }
+
+        // Removing a photo deletes the app's copies only.
+        val key = album.first().key
+        engine.removeMine(key)
+        assertTrue(graph.library.value.myPhotos.none { it.key == key })
+        assertTrue(!File(album.first().file).exists())
+
+        graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
+    }
+
     companion object {
         const val TAG = "DnevenTapetTest"
     }

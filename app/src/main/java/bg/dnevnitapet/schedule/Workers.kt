@@ -20,6 +20,11 @@ class RefillWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     override suspend fun doWork(): Result {
         val graph = Graph.get(applicationContext)
         val engine = graph.engine
+        // Only own photos in use: nothing to download.
+        if (graph.settings.value.photoMode == bg.dnevnitapet.model.PhotoMode.MINE) {
+            graph.scheduler.runIfDue(allowDownload = false)
+            return Result.success()
+        }
         engine.refill()
         val changed = graph.scheduler.runIfDue(allowDownload = true)
         val stillWaiting = changed != null && changed !is ChangeResult.Changed
