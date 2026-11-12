@@ -117,7 +117,7 @@ class WallpaperChangeTest {
     }
 
     @Test
-    fun c_ownPhotosRotateInsteadOfInternetPictures() = runBlocking {
+    fun c_ownPhotosRotateInsteadOfInternetPictures(): Unit = runBlocking {
         val graph = Graph.get(context)
         val engine = graph.engine
         val wm = WallpaperManager.getInstance(context)
