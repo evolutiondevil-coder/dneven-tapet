@@ -128,6 +128,13 @@ data class Settings(
     val autoChange: Boolean = true,
     val photoMode: PhotoMode = PhotoMode.ONLINE,
     val target: WallpaperTarget = WallpaperTarget.HOME,
+    /**
+     * Panorama: the home-screen wallpaper is wider than the screen and slides while the home
+     * screens are swiped (shown by the app's own live wallpaper).
+     */
+    val panorama: Boolean = false,
+    /** How wide the panorama is, in screen widths. */
+    val panoramaScreens: Float = 2f,
     val frequency: FrequencyMode = FrequencyMode.DAILY,
     /** Minutes after midnight for the daily change. */
     val dailyMinuteOfDay: Int = 5 * 60,
@@ -139,4 +146,7 @@ data class Settings(
     val enabledCategories: Set<Category> = Category.entries.toSet(),
     val unsplashKey: String = "",
     val pexelsKey: String = "",
-)
+) {
+    /** Panorama that actually applies: only the home screen slides. */
+    val panoramaOn: Boolean get() = panorama && target != WallpaperTarget.LOCK
+}

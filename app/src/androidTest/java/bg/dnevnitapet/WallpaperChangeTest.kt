@@ -168,6 +168,113 @@ class WallpaperChangeTest {
         graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
     }
 
+    private fun shell(cmd: String): String {
+        val pfd = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(cmd)
+        return android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes().decodeToString() }
+    }
+
+    private fun size(path: String): Pair<Int, Int> {
+        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, o)
+        return o.outWidth to o.outHeight
+    }
+
+    /** Mean difference of the middle band of two screenshots (0 = identical). */
+    private fun difference(a: Bitmap, b: Bitmap): Double {
+        var sum = 0L
+        var n = 0
+        val y0 = a.height * 3 / 10
+        val y1 = a.height * 6 / 10
+        for (y in y0 until y1 step 7) for (x in 0 until minOf(a.width, b.width) step 7) {
+            val p = a.getPixel(x, y)
+            val q = b.getPixel(x, y)
+            sum += kotlin.math.abs(Color.red(p) - Color.red(q)) + kotlin.math.abs(Color.green(p) - Color.green(q)) + kotlin.math.abs(Color.blue(p) - Color.blue(q))
+            n++
+        }
+        return if (n == 0) 0.0 else sum.toDouble() / n
+    }
+
+    @Test
+    fun d_panoramaPreparesWidePicturesAndSlides(): Unit = runBlocking {
+        val graph = Graph.get(context)
+        val engine = graph.engine
+        val (w, h) = DeviceInfo.screenSize(context)
+        graph.settings.update { it.copy(panorama = true, panoramaScreens = 2f, target = WallpaperTarget.HOME, photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
+        engine.refitForPanorama(wasPanorama = false)
+        engine.refill(minQueue = 3)
+        val queue = graph.library.value.queue
+        assertTrue("nothing prepared for the panorama", queue.isNotEmpty())
+        for (item in queue) {
+            val (fw, fh) = size(item.file)
+            Log.i(TAG, "panorama queued ${item.candidate.sourceId} '${item.candidate.title}' ${fw}x$fh")
+            assertEquals(h, fh)
+            assertTrue("width $fw outside ${w}..${2 * w}", fw in w..2 * w)
+        }
+        assertTrue("no wide picture among ${queue.map { size(it.file) }}", queue.any { size(it.file).first > w })
+
+        // Without the live wallpaper: a plain (wide) wallpaper is set.
+        val plain = engine.next(Trigger.MANUAL, allowDownload = false)
+        assertTrue("panorama change failed: $plain", plain is ChangeResult.Changed)
+        assertEquals((plain as ChangeResult.Changed).image.file, bg.dnevnitapet.wallpaper.Panorama.file(context))
+
+        // Switch the live wallpaper on as the user would in the system's preview ("Задай тапет").
+        val component = android.content.ComponentName(context, bg.dnevnitapet.wallpaper.PanoramaWallpaperService::class.java)
+        val wm = WallpaperManager.getInstance(context)
+        val activated = if (android.os.Build.VERSION.SDK_INT >= 29) {
+            val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+            try {
+                automation.adoptShellPermissionIdentity("android.permission.SET_WALLPAPER_COMPONENT")
+                WallpaperManager::class.java.getMethod("setWallpaperComponent", android.content.ComponentName::class.java).invoke(wm, component)
+                true
+            } catch (e: Throwable) {
+                Log.i(TAG, "live wallpaper cannot be set from a test here: $e")
+                false
+            } finally {
+                automation.dropShellPermissionIdentity()
+            }
+        } else {
+            Log.i(TAG, "live wallpaper is not set from tests on Android ${android.os.Build.VERSION.RELEASE}")
+            false
+        }
+        if (!activated) return@runBlocking
+        assertTrue("panorama live wallpaper not active", bg.dnevnitapet.wallpaper.Panorama.isActive(context))
+
+        // Next picture goes to the live wallpaper without replacing it.
+        val live = engine.next(Trigger.MANUAL, allowDownload = true)
+        assertTrue("change with live wallpaper failed: $live", live is ChangeResult.Changed)
+        assertTrue(bg.dnevnitapet.wallpaper.Panorama.isActive(context))
+        val file = (live as ChangeResult.Changed).image.file
+        assertEquals(file, bg.dnevnitapet.wallpaper.Panorama.file(context))
+        Log.i(TAG, "live panorama shows ${size(file)}")
+
+        // Home screen, then a swipe: the picture moves (with the launcher or following the finger).
+        val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        shell("input keyevent KEYCODE_HOME")
+        Thread.sleep(3000)
+        shell("screencap -p /sdcard/Download/panorama-1-home.png")
+        val before = automation.takeScreenshot()
+        shell("input swipe ${w * 85 / 100} ${h / 2} ${w * 15 / 100} ${h / 2} 300")
+        Thread.sleep(2000)
+        shell("screencap -p /sdcard/Download/panorama-2-after-swipe.png")
+        val after = automation.takeScreenshot()
+        shell("input swipe ${w * 85 / 100} ${h / 2} ${w * 15 / 100} ${h / 2} 300")
+        Thread.sleep(2000)
+        shell("screencap -p /sdcard/Download/panorama-3-after-second-swipe.png")
+        shell("input swipe ${w * 15 / 100} ${h / 2} ${w * 85 / 100} ${h / 2} 300")
+        Thread.sleep(2000)
+        shell("screencap -p /sdcard/Download/panorama-4-back.png")
+        if (before != null && after != null) {
+            val d = difference(before, after)
+            Log.i(TAG, "panorama: screen difference after swipe $d")
+            assertTrue("the home screen did not move after a swipe (difference $d)", d > 3.0)
+        }
+
+        // Switching the panorama off puts a plain wallpaper back.
+        graph.settings.update { it.copy(panorama = false) }
+        engine.refitForPanorama(wasPanorama = true)
+        assertTrue("live wallpaper still on after switching the panorama off", !bg.dnevnitapet.wallpaper.Panorama.isActive(context))
+    }
+
     companion object {
         const val TAG = "DnevenTapetTest"
     }

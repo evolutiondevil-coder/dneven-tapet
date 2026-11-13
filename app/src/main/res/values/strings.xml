@@ -6,4 +6,6 @@
     <string name="tile_label">Следващ тапет</string>
     <string name="widget_next">Следваща снимка</string>
     <string name="widget_favorite">Любима</string>
+    <string name="panorama_label">Дневен тапет – панорама</string>
+    <string name="panorama_description">Днешната снимка, по-широка от екрана: плъзга се заедно с началните екрани</string>
 </resources>

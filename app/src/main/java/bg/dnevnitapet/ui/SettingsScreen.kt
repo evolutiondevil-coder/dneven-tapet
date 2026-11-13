@@ -72,6 +72,7 @@ import bg.dnevnitapet.model.WallpaperTarget
 import bg.dnevnitapet.sources.SourceRegistry
 import bg.dnevnitapet.sources.label
 import bg.dnevnitapet.util.Power
+import bg.dnevnitapet.wallpaper.Panorama
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +90,11 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     val unrestricted = remember(tick) { Power.isUnrestricted(context) }
     val dataSaver = remember(tick) { Power.dataSaverBlocksBackground(context) }
     val exact = remember(tick) { vm.canScheduleExact() }
+    val panoramaActive = remember(tick, s.panorama) { Panorama.isActive(context) }
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    val openPanorama = {
+        if (!Panorama.openPicker(context)) vm.hint("Телефонът няма екран за живи тапети – панорамата не може да се включи.")
+    }
     var unusedPause by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(tick) {
         unusedPause = withContext(Dispatchers.IO) { Power.unusedAppPauseActive(context) }
@@ -130,6 +136,47 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     RadioRow("И двата", s.target == WallpaperTarget.BOTH) { update { it.copy(target = WallpaperTarget.BOTH) } }
                     if (s.target != WallpaperTarget.HOME) {
                         Hint("Ако телефонът ти сам сменя заключения екран (напр. „Динамичен заключен екран“ на Samsung или „Карусел“ на Xiaomi), той ще бъде заменен от тази снимка.")
+                    }
+                }
+            }
+
+            item { Header("Панорама") }
+            item {
+                SwitchRow(
+                    "Снимката продължава между екраните",
+                    "Тапетът е по-широк от екрана: плъзгаш наляво или надясно по началния екран и снимката се движи заедно с екраните",
+                    s.panorama,
+                ) { v -> vm.setPanorama(v) { if (!Panorama.isActive(context)) openPanorama() } }
+            }
+            if (s.panorama) {
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Text("Колко широка:", style = MaterialTheme.typography.bodyMedium)
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(1.5f to "1,5 екрана", 2f to "2 екрана", 3f to "3 екрана").forEach { (w, label) ->
+                                FilterChip(
+                                    selected = s.panoramaScreens == w,
+                                    enabled = !busy,
+                                    onClick = { update { it.copy(panoramaScreens = w) } },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                        StatusRow(
+                            ok = panoramaActive,
+                            title = if (panoramaActive) "Панорамата е на началния екран" else "Остава една стъпка",
+                            text = if (panoramaActive) "Плъзгай между екраните – снимката се движи с тях."
+                            else "Натисни „Включи“ и в прегледа избери „Задай тапет“ (на Samsung „Задаване“) → „Начален екран“. Прави се само веднъж.",
+                            action = if (panoramaActive) null else ("Включи" to openPanorama),
+                        )
+                        Hint("Ако на твоя телефон снимката не се мести сама при смяна на екраните, тя следва пръста ти: плъзни наляво или надясно по празно място на началния екран.")
+                        Hint("Вертикалните снимки (и някои твои снимки) са тесни – те остават с размера на екрана.")
+                        if (s.target == WallpaperTarget.LOCK) {
+                            Hint("Панорамата е само за началния екран – избери горе „Начален екран“ или „И двата“.")
+                        } else if (s.target == WallpaperTarget.BOTH) {
+                            Hint("На заключения екран се слага средата на снимката.")
+                        }
                     }
                 }
             }

@@ -17,7 +17,8 @@ import kotlin.math.roundToInt
 class ImageTooSmallException(message: String) : IOException(message)
 
 /**
- * Turns a downloaded picture into a wallpaper file of exactly the screen's size:
+ * Turns a downloaded picture into a wallpaper file of exactly the screen's size (or, for the
+ * panorama, the screen's height and up to a few screens wide):
  * finds the crop that keeps the subject, decodes only that region (big originals never
  * have to fit in memory) and saves a high-quality JPEG.
  */
@@ -44,6 +45,8 @@ class ImageProcessor {
         manualCrop: CropFraction? = null,
         /** The user's own photos are used even when small (they chose them). */
         allowUpscale: Boolean = false,
+        /** Panorama: the file may be up to this wide (wide pictures); [targetW] = always screen-wide. */
+        maxTargetW: Int = targetW,
     ): Output {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(src.path, bounds)
@@ -51,7 +54,8 @@ class ImageProcessor {
 
         val rotation = exifRotation(src)
         val (w, h) = if (rotation == 90 || rotation == 270) bounds.outHeight to bounds.outWidth else bounds.outWidth to bounds.outHeight
-        val aspect = targetW.toDouble() / targetH
+        val outW = WallpaperSize.width(targetW, targetH, maxTargetW, w, h)
+        val aspect = outW.toDouble() / targetH
         if (manualCrop == null && !allowUpscale) {
             val upscale = targetH / min(h.toDouble(), w / aspect)
             if (upscale > VariantChooser.MAX_UPSCALE) {
@@ -64,7 +68,7 @@ class ImageProcessor {
             composedForPortrait -> SmartCrop.centreCrop(w, h, aspect)
             else -> smartCrop(src, rotation, w, h, aspect)
         }
-        val bitmap = if (rotation == 0) decodeRegion(src, crop, targetW, targetH) else decodeRotated(src, rotation, crop, w, targetW, targetH)
+        val bitmap = if (rotation == 0) decodeRegion(src, crop, outW, targetH) else decodeRotated(src, rotation, crop, w, outW, targetH)
         try {
             dest.parentFile?.mkdirs()
             val tmp = File(dest.path + ".tmp")

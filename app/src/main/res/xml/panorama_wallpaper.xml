@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The panorama live wallpaper (see PanoramaWallpaperService). -->
+<wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/panorama_description"
+    android:settingsActivity="bg.dnevnitapet.ui.MainActivity"
+    android:thumbnail="@drawable/ic_launcher_foreground" />

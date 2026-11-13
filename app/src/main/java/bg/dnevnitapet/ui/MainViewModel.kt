@@ -251,6 +251,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val before = settings.value
             val after = graph.settings.update(transform)
+            if (before.panoramaOn != after.panoramaOn || (after.panoramaOn && before.panoramaScreens != after.panoramaScreens)) {
+                refitPanorama(before.panoramaOn)
+            }
             if (before.wifiOnly != after.wifiOnly || before.enabledSources != after.enabledSources ||
                 before.photoMode != after.photoMode ||
                 before.enabledCategories != after.enabledCategories ||
@@ -259,6 +262,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 scheduler.enqueueRefill(replace = true)
             }
             scheduler.reschedule()
+        }
+    }
+
+    /** (Re)cuts the pictures for the panorama setting that has just changed. */
+    private suspend fun refitPanorama(wasOn: Boolean) {
+        _busy.value = true
+        try {
+            if (settings.value.panoramaOn) say("Подготвям по-широки снимки за панорамата…")
+            engine.refitForPanorama(wasOn)?.let { if (it is ChangeResult.Failed) report(it) }
+        } finally {
+            _busy.value = false
+        }
+        scheduler.enqueueRefill(replace = true)
+    }
+
+    /**
+     * Switches the panorama on or off. When switched on, the wider pictures are prepared first and
+     * then [onReady] opens the system screen where the user confirms the live wallpaper once.
+     */
+    fun setPanorama(on: Boolean, onReady: () -> Unit) {
+        viewModelScope.launch {
+            val before = settings.value
+            graph.settings.update { it.copy(panorama = on) }
+            if (before.panoramaOn != settings.value.panoramaOn) refitPanorama(before.panoramaOn)
+            scheduler.reschedule()
+            if (on) {
+                onReady()
+            } else {
+                say("Панорамата е изключена – тапетът е пак с размера на екрана")
+            }
         }
     }
 
@@ -419,7 +452,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         bg.dnevnitapet.image.ImageProcessor.CropFraction(image.cropLeft, image.cropTop, image.cropRight, image.cropBottom)
                     else -> null
                 }
-                val (sw, sh) = bg.dnevnitapet.wallpaper.DeviceInfo.screenSize(getApplication())
+                val (_, sh) = bg.dnevnitapet.wallpaper.DeviceInfo.screenSize(getApplication())
+                // The frame has the wallpaper's shape: the screen, or wider for the panorama.
+                val sw = engine.outputWidth(preview.sourceWidth, preview.sourceHeight)
                 _crop.value = CropState.Ready(image, source, preview.bitmap, preview.sourceWidth, preview.sourceHeight, initial, sw, sh)
                 if (!source.fullPicture) say("Няма връзка с източника – можеш само да приближиш в рамките на сегашния тапет.")
             } catch (e: Exception) {

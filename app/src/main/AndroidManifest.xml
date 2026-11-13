@@ -7,6 +7,12 @@
     <!-- "Wi-Fi only" option and waiting for a connection. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Panorama without the live wallpaper: tells the system the wallpaper is wider than the screen. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
+    <!-- The panorama is a live wallpaper; phones without live wallpapers can still install the app. -->
+    <uses-feature
+        android:name="android.software.live_wallpaper"
+        android:required="false" />
     <!-- Re-plan the daily change after a restart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- One-tap system dialog for "battery: unrestricted" (Samsung otherwise stops the app). -->
@@ -73,6 +79,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
         </receiver>
+
+        <service
+            android:name=".wallpaper.PanoramaWallpaperService"
+            android:exported="true"
+            android:label="@string/panorama_label"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/panorama_wallpaper" />
+        </service>
 
         <service
             android:name=".tile.NextTileService"

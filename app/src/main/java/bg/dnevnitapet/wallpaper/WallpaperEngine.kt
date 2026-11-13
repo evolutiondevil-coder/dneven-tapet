@@ -4,6 +4,7 @@ import android.content.Context
 import bg.dnevnitapet.data.JsonFileStore
 import bg.dnevnitapet.image.ImageProcessor
 import bg.dnevnitapet.image.VariantChooser
+import bg.dnevnitapet.image.WallpaperSize
 import bg.dnevnitapet.model.Candidate
 import bg.dnevnitapet.model.LibraryState
 import bg.dnevnitapet.model.LogEntry
@@ -99,7 +100,7 @@ class WallpaperEngine(
                 return@withContext ChangeResult.NoImage
             }
             try {
-                setter.apply(File(item.file), settings.value.target)
+                setter.apply(File(item.file), settings.value.target, settings.value.panoramaOn)
             } catch (e: Exception) {
                 library.update { it.copy(queue = listOf(item) + it.queue) }
                 log("Грешка при смяна на тапета: ${describe(e)}")
@@ -128,7 +129,7 @@ class WallpaperEngine(
         imagesDir.mkdirs()
         src.copyTo(copy, overwrite = true)
         try {
-            setter.apply(copy, settings.value.target)
+            setter.apply(copy, settings.value.target, settings.value.panoramaOn)
         } catch (e: Exception) {
             copy.delete()
             log("Грешка при смяна на тапета: ${describe(e)}")
@@ -183,7 +184,7 @@ class WallpaperEngine(
     ): ImportResult = withContext(Dispatchers.IO) {
         val room = (MyPhotos.MAX_PHOTOS - library.value.myPhotos.size).coerceAtLeast(0)
         val todo = uris.take(room)
-        val (tw, th) = DeviceInfo.screenSize(context)
+        val (tw, th, maxW) = sizes()
         mineDir.mkdirs()
         downloadsDir.mkdirs()
         var added = 0
@@ -204,7 +205,7 @@ class WallpaperEngine(
                 val src = File(mineDir, "$id.src.jpg")
                 processor.saveUprightCopy(tmp, src, MINE_SOURCE_SIDE)
                 val wall = File(mineDir, "$id.jpg")
-                val out = processor.process(src, wall, tw, th, composedForPortrait = false, allowUpscale = true)
+                val out = processor.process(src, wall, tw, th, composedForPortrait = false, allowUpscale = true, maxTargetW = maxW)
                 val bg = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("bg"))
                 val candidate = Candidate(
                     key = "${MyPhotos.SOURCE_ID}:$id",
@@ -258,7 +259,7 @@ class WallpaperEngine(
             val item = queue[index]
             if (!File(item.file).exists()) return@withContext ChangeResult.Failed("Файлът на снимката липсва")
             try {
-                setter.apply(File(item.file), settings.value.target)
+                setter.apply(File(item.file), settings.value.target, settings.value.panoramaOn)
             } catch (e: Exception) {
                 log("Грешка при смяна на тапета: ${describe(e)}")
                 return@withContext ChangeResult.Failed(describe(e))
@@ -410,11 +411,11 @@ class WallpaperEngine(
             val st = library.value
             val image = (listOfNotNull(st.current) + st.queue + st.history + st.favorites + st.myPhotos).firstOrNull { it.key == key }
                 ?: return@withContext ChangeResult.Failed("Снимката вече не е в списъка")
-            val (tw, th) = DeviceInfo.screenSize(context)
+            val (tw, th, maxW) = sizes()
             imagesDir.mkdirs()
             val dest = File(imagesDir, fileName(key) + "-" + clock() + ".jpg")
             val out = try {
-                processor.process(source.file, dest, tw, th, composedForPortrait = false, manualCrop = crop)
+                processor.process(source.file, dest, tw, th, composedForPortrait = false, manualCrop = crop, maxTargetW = maxW)
             } catch (e: Exception) {
                 dest.delete()
                 return@withContext ChangeResult.Failed(describe(e))
@@ -422,7 +423,7 @@ class WallpaperEngine(
             val isCurrent = st.current?.key == key
             if (isCurrent) {
                 try {
-                    setter.apply(dest, settings.value.target)
+                    setter.apply(dest, settings.value.target, settings.value.panoramaOn)
                 } catch (e: Exception) {
                     return@withContext ChangeResult.Failed(describe(e))
                 }
@@ -457,6 +458,76 @@ class WallpaperEngine(
     suspend fun clearQueue() {
         library.update { it.copy(queue = emptyList()) }
         cleanupFiles()
+    }
+
+    /**
+     * The panorama was switched on or off (or made wider): the prepared pictures are thrown away
+     * (they are refilled in the new size), the own photos and the current wallpaper are cut again.
+     * @param wasPanorama the panorama was on before the change.
+     */
+    suspend fun refitForPanorama(wasPanorama: Boolean): ChangeResult? = changeMutex.withLock {
+        withContext(Dispatchers.IO) {
+            library.update { it.copy(queue = emptyList()) }
+            val (tw, th, maxW) = sizes()
+            val st = library.value
+            val mine = st.myPhotos.map { photo ->
+                val src = File(photo.sourceUrl.removePrefix("file:"))
+                if (!photo.sourceUrl.startsWith("file:") || !src.exists()) return@map photo
+                val manual = photo.takeIf { it.userCrop && it.hasCrop }
+                    ?.let { ImageProcessor.CropFraction(it.cropLeft, it.cropTop, it.cropRight, it.cropBottom) }
+                val tmp = File(photo.file + ".new")
+                try {
+                    val out = processor.process(src, tmp, tw, th, composedForPortrait = false, manualCrop = manual, allowUpscale = true, maxTargetW = maxW)
+                    tmp.copyTo(File(photo.file), overwrite = true)
+                    photo.copy(width = out.width, height = out.height, cropLeft = out.crop.left, cropTop = out.crop.top, cropRight = out.crop.right, cropBottom = out.crop.bottom)
+                } catch (e: Exception) {
+                    log("Моя снимка не се изряза наново: ${describe(e)}")
+                    photo
+                } finally {
+                    tmp.delete()
+                }
+            }
+            library.update { s -> s.copy(myPhotos = s.myPhotos.map { p -> mine.firstOrNull { it.key == p.key } ?: p }) }
+
+            val current = library.value.current
+            var result: ChangeResult? = null
+            if (current != null) {
+                val dest = File(imagesDir, fileName(current.key) + "-" + clock() + ".jpg")
+                val remade: StoredImage? = try {
+                    val own = library.value.myPhotos.firstOrNull { it.key == current.key }
+                    when {
+                        own != null -> {
+                            imagesDir.mkdirs()
+                            File(own.file).copyTo(dest, overwrite = true)
+                            current.copy(file = dest.path, width = own.width, height = own.height, cropLeft = own.cropLeft, cropTop = own.cropTop, cropRight = own.cropRight, cropBottom = own.cropBottom)
+                        }
+                        current.candidate.variants.isNotEmpty() && DeviceInfo.isNetworkAllowed(context, settings.value) ->
+                            withTimeout(60_000) { prepare(current.candidate, dest, keep = current) }
+                        else -> null
+                    }
+                } catch (e: Exception) {
+                    dest.delete()
+                    log("Тапетът не се изряза наново: ${describe(e)}")
+                    null
+                }
+                val file = File(remade?.file ?: current.file)
+                result = try {
+                    val s = settings.value
+                    if (wasPanorama && !s.panoramaOn) setter.leavePanorama(file)
+                    if (remade != null || s.panoramaOn) setter.apply(file, s.target, s.panoramaOn)
+                    if (remade != null) library.update { it.copy(current = remade) }
+                    onChanged?.invoke()
+                    ChangeResult.Changed(remade ?: current)
+                } catch (e: Exception) {
+                    dest.delete()
+                    log("Грешка при смяна на тапета: ${describe(e)}")
+                    ChangeResult.Failed(describe(e))
+                }
+            }
+            log(if (settings.value.panoramaOn) "Панорама: снимките се подготвят по-широки" else "Панорамата е изключена")
+            cleanupFiles()
+            result
+        }
     }
 
     // ---------------------------------------------------------------- preparing pictures
@@ -513,26 +584,51 @@ class WallpaperEngine(
         }
     }
 
-    private suspend fun prepare(candidate: Candidate): StoredImage {
-        val (tw, th) = DeviceInfo.screenSize(context)
-        val choice = VariantChooser.choose(candidate.variants, tw, th)
+    /**
+     * Downloads and cuts [candidate] for the screen (wider for the panorama). [keep] = an already
+     * shown picture cut again: its details and a hand-made cut are kept.
+     */
+    private suspend fun prepare(
+        candidate: Candidate,
+        dest: File = File(imagesDir, fileName(candidate.key) + ".jpg"),
+        keep: StoredImage? = null,
+    ): StoredImage {
+        val (tw, th, maxW) = sizes()
+        // For the panorama a wide rendition is wanted; a picture that has none stays screen-wide.
+        val choice = (if (maxW > tw) VariantChooser.choose(candidate.variants, maxW, th) else null)
+            ?: VariantChooser.choose(candidate.variants, tw, th)
             ?: throw IllegalStateException("няма достатъчно голям вариант")
         downloadsDir.mkdirs()
         val download = File(downloadsDir, fileName(candidate.key) + ".download")
         try {
             http.downloadImage(choice.url, download)
             imagesDir.mkdirs()
-            val dest = File(imagesDir, fileName(candidate.key) + ".jpg")
             val composed = choice.variant.portrait || choice.variant.sizedTemplate
-            val out = processor.process(download, dest, tw, th, composed)
-            return StoredImage(
-                candidate, dest.path, out.width, out.height, addedAt = clock(),
+            val manual = keep?.takeIf { it.userCrop && it.hasCrop && it.sourceUrl == choice.url }
+                ?.let { ImageProcessor.CropFraction(it.cropLeft, it.cropTop, it.cropRight, it.cropBottom) }
+            val out = processor.process(download, dest, tw, th, composed, manualCrop = manual, maxTargetW = maxW)
+            val base = keep ?: StoredImage(candidate, dest.path, out.width, out.height, addedAt = clock())
+            return base.copy(
+                file = dest.path, width = out.width, height = out.height,
                 sourceUrl = choice.url,
                 cropLeft = out.crop.left, cropTop = out.crop.top, cropRight = out.crop.right, cropBottom = out.crop.bottom,
+                userCrop = manual != null,
             )
         } finally {
             download.delete()
         }
+    }
+
+    /** Screen width and height, and the widest wallpaper file (wider than the screen for the panorama). */
+    private fun sizes(): Triple<Int, Int, Int> {
+        val (w, h) = DeviceInfo.screenSize(context)
+        return Triple(w, h, Panorama.maxWidth(w, settings.value))
+    }
+
+    /** Width of the wallpaper file cut from a [srcW] x [srcH] picture (the crop editor's frame). */
+    fun outputWidth(srcW: Int, srcH: Int): Int {
+        val (w, h, maxW) = sizes()
+        return WallpaperSize.width(w, h, maxW, srcW, srcH)
     }
 
     private fun eligible(c: Candidate, st: LibraryState, s: Settings): Boolean {
