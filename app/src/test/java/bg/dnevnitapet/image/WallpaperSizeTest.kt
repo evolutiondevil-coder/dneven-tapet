@@ -30,7 +30,9 @@ class WallpaperSizeTest {
 
     @Test
     fun tallOrBarelyWiderPicturesStayScreenWide() {
-        assertEquals(w, WallpaperSize.width(w, h, 2 * w, 1080, 1920))
+        assertEquals(w, WallpaperSize.width(w, h, 2 * w, 1080, 2400))
+        // 9:16 is still a little wider than this 9:19.5 screen.
+        assertEquals(1316, WallpaperSize.width(w, h, 2 * w, 1080, 1920))
         assertEquals(w, WallpaperSize.width(w, h, 2 * w, 1100, 2340))
         assertEquals(w, WallpaperSize.width(w, h, 2 * w, 0, 0))
     }
