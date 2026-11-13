@@ -80,10 +80,7 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
     var selected by remember { mutableStateOf<StoredImage?>(null) }
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
 
-    // System photo picker: no storage permission needed; the app copies what is picked.
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(maxItems = 50)) { uris ->
-        vm.addMyPhotos(uris)
-    }
+    val pickPhotos = rememberPhotoPicker(vm)
     val room = MyPhotos.MAX_PHOTOS - st.myPhotos.size
     val bytes = remember(st.myPhotos.size) { vm.myPhotosBytes() }
 
@@ -98,7 +95,7 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
         floatingActionButton = {
             if (importing == null && room > 0) {
                 ExtendedFloatingActionButton(
-                    onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    onClick = pickPhotos,
                     icon = { Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null) },
                     text = { Text("Добави снимки") },
                 )
@@ -112,7 +109,8 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                PhotoModeCard(settings.photoMode, hasPhotos = st.myPhotos.isNotEmpty(), onSelect = vm::setPhotoMode)
+                // The button below is there already; the card only opens the picker when there are no photos.
+                PhotoModeCard(settings.photoMode, hasPhotos = st.myPhotos.isNotEmpty(), onSelect = vm::setPhotoMode, onAddPhotos = pickPhotos, showAddButton = false)
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(Modifier.padding(vertical = 8.dp)) {
@@ -205,9 +203,32 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
     }
 }
 
-/** Choice of where the wallpapers come from; used here and in the settings. */
+/** Opens the system photo picker (no storage permission needed; the app copies what is picked). */
 @Composable
-fun PhotoModeCard(mode: PhotoMode, hasPhotos: Boolean, onSelect: (PhotoMode) -> Unit) {
+fun rememberPhotoPicker(vm: MainViewModel): () -> Unit {
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(maxItems = 50)) { uris ->
+        vm.addMyPhotos(uris)
+    }
+    return remember(picker) { { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) } }
+}
+
+/**
+ * Choice of where the wallpapers come from; used here and in the settings. Choosing own photos
+ * while there are none opens the phone's photo picker right away.
+ */
+@Composable
+fun PhotoModeCard(
+    mode: PhotoMode,
+    hasPhotos: Boolean,
+    onSelect: (PhotoMode) -> Unit,
+    onAddPhotos: () -> Unit,
+    showAddButton: Boolean = true,
+    importing: Pair<Int, Int>? = null,
+) {
+    val choose: (PhotoMode) -> Unit = { m ->
+        onSelect(m)
+        if (m != PhotoMode.ONLINE && !hasPhotos && importing == null) onAddPhotos()
+    }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(vertical = 8.dp)) {
             Text(
@@ -215,10 +236,23 @@ fun PhotoModeCard(mode: PhotoMode, hasPhotos: Boolean, onSelect: (PhotoMode) -> 
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             )
-            ModeRow("Снимки от интернет", "Bing, Spotlight, Wikimedia, NASA…", mode == PhotoMode.ONLINE) { onSelect(PhotoMode.ONLINE) }
-            ModeRow("Моите снимки от телефона", "Само снимките, добавени тук – в разбъркан ред", mode == PhotoMode.MINE) { onSelect(PhotoMode.MINE) }
-            ModeRow("Смесено", "Редуват се: една твоя, една от интернет", mode == PhotoMode.MIXED) { onSelect(PhotoMode.MIXED) }
-            if (mode != PhotoMode.ONLINE && !hasPhotos) {
+            ModeRow("Снимки от интернет", "Bing, Spotlight, Wikimedia, NASA…", mode == PhotoMode.ONLINE) { choose(PhotoMode.ONLINE) }
+            ModeRow("Моите снимки от телефона", "Само снимките, добавени тук – в разбъркан ред", mode == PhotoMode.MINE) { choose(PhotoMode.MINE) }
+            ModeRow("Смесено", "Редуват се: една твоя, една от интернет", mode == PhotoMode.MIXED) { choose(PhotoMode.MIXED) }
+            if (importing != null) {
+                Text(
+                    "Добавям снимки… ${importing.first} от ${importing.second}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+            } else if (mode != PhotoMode.ONLINE && showAddButton) {
+                Button(onClick = onAddPhotos, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (hasPhotos) "Добави още снимки" else "Избери снимки от телефона")
+                }
+            }
+            if (mode != PhotoMode.ONLINE && !hasPhotos && importing == null) {
                 Text(
                     "Добави поне една снимка, иначе няма какво да се върти.",
                     color = MaterialTheme.colorScheme.error,

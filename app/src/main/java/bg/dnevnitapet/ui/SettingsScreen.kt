@@ -92,6 +92,8 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     val exact = remember(tick) { vm.canScheduleExact() }
     val panoramaActive = remember(tick, s.panorama) { Panorama.isActive(context) }
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val importing by vm.importing.collectAsStateWithLifecycle()
+    val pickPhotos = rememberPhotoPicker(vm)
     val openPanorama = {
         if (!Panorama.openPicker(context)) vm.hint("Телефонът няма екран за живи тапети – панорамата не може да се включи.")
     }
@@ -121,7 +123,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
             item { Header("Какви снимки") }
             item {
                 Column(Modifier.padding(horizontal = 16.dp)) {
-                    PhotoModeCard(s.photoMode, hasPhotos = st.myPhotos.isNotEmpty(), onSelect = vm::setPhotoMode)
+                    PhotoModeCard(s.photoMode, hasPhotos = st.myPhotos.isNotEmpty(), onSelect = vm::setPhotoMode, onAddPhotos = pickPhotos, importing = importing)
                     OutlinedButton(onClick = onOpenMyPhotos, modifier = Modifier.padding(top = 8.dp)) {
                         Text("Моите снимки от телефона (${st.myPhotos.size})")
                     }

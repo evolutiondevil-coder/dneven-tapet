@@ -122,6 +122,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val st by vm.library.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val pickPhotos = rememberPhotoPicker(vm)
     val loadingMore by vm.loadingMore.collectAsStateWithLifecycle()
     val previewKey by vm.previewKey.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -236,7 +237,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     empty = latestList.isEmpty(),
                     onlyMine = settings.photoMode == PhotoMode.MINE,
                     onRetry = vm::loadMore,
-                    onAddPhotos = { onNavigate(Screen.MY_PHOTOS) },
+                    onAddPhotos = pickPhotos,
                 )
             }
         }

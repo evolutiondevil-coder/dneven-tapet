@@ -352,10 +352,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun myPhotosBytes(): Long = engine.myPhotosBytes()
 
     fun setPhotoMode(mode: PhotoMode) {
+        // With no own photos yet the screen opens the phone's photo picker right away.
         updateSettings { it.copy(photoMode = mode) }
-        if (mode != PhotoMode.ONLINE && library.value.myPhotos.isEmpty()) {
-            say("Добави снимки от телефона – бутон „Добави снимки“.")
-        }
     }
 
     fun addMyPhotos(uris: List<android.net.Uri>) {
