@@ -179,21 +179,6 @@ class WallpaperChangeTest {
         return o.outWidth to o.outHeight
     }
 
-    /** Mean difference of the middle band of two screenshots (0 = identical). */
-    private fun difference(a: Bitmap, b: Bitmap): Double {
-        var sum = 0L
-        var n = 0
-        val y0 = a.height * 3 / 10
-        val y1 = a.height * 6 / 10
-        for (y in y0 until y1 step 7) for (x in 0 until minOf(a.width, b.width) step 7) {
-            val p = a.getPixel(x, y)
-            val q = b.getPixel(x, y)
-            sum += kotlin.math.abs(Color.red(p) - Color.red(q)) + kotlin.math.abs(Color.green(p) - Color.green(q)) + kotlin.math.abs(Color.blue(p) - Color.blue(q))
-            n++
-        }
-        return if (n == 0) 0.0 else sum.toDouble() / n
-    }
-
     @Test
     fun d_panoramaPreparesWidePicturesAndSlides(): Unit = runBlocking {
         val graph = Graph.get(context)
@@ -247,27 +232,27 @@ class WallpaperChangeTest {
         assertEquals(file, bg.dnevnitapet.wallpaper.Panorama.file(context))
         Log.i(TAG, "live panorama shows ${size(file)}")
 
-        // Home screen, then a swipe: the picture moves (with the launcher or following the finger).
-        val automation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        // Home screen, then swipes: the picture moves (with the launcher's position or following the finger).
+        val stats = bg.dnevnitapet.wallpaper.PanoramaWallpaperService.Stats
         shell("input keyevent KEYCODE_HOME")
         Thread.sleep(3000)
         shell("screencap -p /sdcard/Download/panorama-1-home.png")
-        val before = automation.takeScreenshot()
+        Log.i(TAG, "panorama on the home screen: $stats")
+        assertTrue("the live wallpaper never drew the picture: $stats", stats.draws > 0)
+        val start = stats.offset
         shell("input swipe ${w * 85 / 100} ${h / 2} ${w * 15 / 100} ${h / 2} 300")
         Thread.sleep(2000)
         shell("screencap -p /sdcard/Download/panorama-2-after-swipe.png")
-        val after = automation.takeScreenshot()
-        shell("input swipe ${w * 85 / 100} ${h / 2} ${w * 15 / 100} ${h / 2} 300")
-        Thread.sleep(2000)
-        shell("screencap -p /sdcard/Download/panorama-3-after-second-swipe.png")
+        val afterFirst = stats.offset
+        Log.i(TAG, "panorama after a swipe to the left: $stats")
         shell("input swipe ${w * 15 / 100} ${h / 2} ${w * 85 / 100} ${h / 2} 300")
         Thread.sleep(2000)
-        shell("screencap -p /sdcard/Download/panorama-4-back.png")
-        if (before != null && after != null) {
-            val d = difference(before, after)
-            Log.i(TAG, "panorama: screen difference after swipe $d")
-            assertTrue("the home screen did not move after a swipe (difference $d)", d > 3.0)
-        }
+        shell("screencap -p /sdcard/Download/panorama-3-back.png")
+        Log.i(TAG, "panorama after a swipe back: $stats")
+        assertTrue(
+            "the picture did not slide (offset $start -> $afterFirst -> ${stats.offset}; $stats)",
+            kotlin.math.abs(afterFirst - start) > 0.05f || kotlin.math.abs(stats.offset - afterFirst) > 0.05f,
+        )
 
         // Switching the panorama off puts a plain wallpaper back.
         graph.settings.update { it.copy(panorama = false) }

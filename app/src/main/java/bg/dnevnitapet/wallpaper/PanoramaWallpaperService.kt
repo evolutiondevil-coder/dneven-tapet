@@ -124,6 +124,9 @@ class PanoramaWallpaperService : WallpaperService() {
 
         override fun onOffsetsChanged(xOffset: Float, yOffset: Float, xOffsetStep: Float, yOffsetStep: Float, xPixelOffset: Int, yPixelOffset: Int) {
             if (isPreview) return
+            Stats.offsetEvents++
+            Stats.lastLauncherOffset = xOffset
+            if (Stats.offsetEvents <= 3) Log.i(TAG, "offsets x=$xOffset step=$xOffsetStep")
             if (!launcherScrolls) {
                 // Only a launcher that reports different positions really slides; one that always
                 // says "middle" (or nothing) is handled by following the finger.
@@ -133,6 +136,7 @@ class PanoramaWallpaperService : WallpaperService() {
                 }
                 if (abs(xOffset - firstLauncherOffset) < 0.01f) return
                 launcherScrolls = true
+                Stats.launcherScrolls = true
                 Log.i(TAG, "launcher reports positions (step $xOffsetStep)")
             }
             handler.removeCallbacks(animate)
@@ -141,6 +145,7 @@ class PanoramaWallpaperService : WallpaperService() {
         }
 
         override fun onTouchEvent(event: MotionEvent) {
+            if (!isPreview) Stats.touchEvents++
             if (launcherScrolls || isPreview || surfaceW <= 0) return
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -219,12 +224,29 @@ class PanoramaWallpaperService : WallpaperService() {
                 matrix.setScale(p.scale, p.scale)
                 matrix.postTranslate(p.left, p.top)
                 canvas.drawBitmap(bmp, matrix, paint)
+                if (!isPreview) {
+                    Stats.draws++
+                    Stats.offset = offset
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "draw failed", e)
             } finally {
                 if (canvas != null) runCatching { holder.unlockCanvasAndPost(canvas) }
             }
         }
+    }
+
+    /** What the panorama did (read by the emulator test; the app itself does not use it). */
+    object Stats {
+        @Volatile var draws = 0
+        @Volatile var offset = 0.5f
+        @Volatile var offsetEvents = 0
+        @Volatile var lastLauncherOffset = Float.NaN
+        @Volatile var touchEvents = 0
+        @Volatile var launcherScrolls = false
+
+        override fun toString() =
+            "draws=$draws offset=$offset offsetEvents=$offsetEvents launcherOffset=$lastLauncherOffset touches=$touchEvents launcherScrolls=$launcherScrolls"
     }
 
     companion object {
