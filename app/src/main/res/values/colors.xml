@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="window_background">#FF101418</color>
-    <color name="icon_background_start">#FF1E3C72</color>
-    <color name="icon_background_end">#FF3E7CB1</color>
     <color name="widget_background">#D9202428</color>
     <color name="widget_text">#FFFFFFFF</color>
     <color name="widget_next_background">#FFFFFFFF</color>

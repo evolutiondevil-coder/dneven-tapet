@@ -273,6 +273,11 @@ class WallpaperChangeTest {
         graph.settings.update { it.copy(panorama = false) }
         engine.refitForPanorama(wasPanorama = true)
         assertTrue("live wallpaper still on after switching the panorama off", !bg.dnevnitapet.wallpaper.Panorama.isActive(context))
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            assertTrue("lock screen still shows the live wallpaper", wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK) == null)
+        }
+        // Leave plain wallpapers behind (the app is uninstalled after the tests).
+        wm.clear(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
     }
 
     companion object {

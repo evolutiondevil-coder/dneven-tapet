@@ -3,4 +3,4 @@
 <wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/panorama_description"
     android:settingsActivity="bg.dnevnitapet.ui.MainActivity"
-    android:thumbnail="@drawable/ic_launcher_foreground" />
+    android:thumbnail="@mipmap/ic_launcher" />

@@ -61,12 +61,16 @@ class WallpaperSetter(private val context: Context) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
         Panorama.hintSize(context, wm, sw, sh, sw, sh)
+        // Set for "home and lock" in the system's preview: the lock screen gets a plain picture too.
+        val lockToo = Build.VERSION.SDK_INT >= 34 &&
+            runCatching { wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK)?.packageName == context.packageName }.getOrDefault(false)
+        val flags = WallpaperManager.FLAG_SYSTEM or (if (lockToo) WallpaperManager.FLAG_LOCK else 0)
         if (bounds.outWidth.toLong() * sh > bounds.outHeight.toLong() * sw * 21 / 20) {
             middle(file, sw, sh).let { bmp ->
-                try { wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_SYSTEM) } finally { bmp.recycle() }
+                try { wm.setBitmap(bmp, null, true, flags) } finally { bmp.recycle() }
             }
         } else {
-            stream(wm, file, WallpaperManager.FLAG_SYSTEM)
+            stream(wm, file, flags)
         }
     }
 

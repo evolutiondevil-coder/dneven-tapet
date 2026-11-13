@@ -51,6 +51,9 @@ status=0
 # The panorama test switches the live wallpaper on through a system call a normal app cannot use.
 adb shell settings put global hidden_api_policy 1 || true
 ./gradlew --no-daemon connectedDebugAndroidTest || status=$?
+# If the system restarted meanwhile, wait until it is up again.
+adb wait-for-device
+for i in $(seq 1 60); do [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break; sleep 2; done
 adb shell settings delete global hidden_api_policy > /dev/null 2>&1 || true
 # Screenshots of the panorama (home screen before/after swipes), taken by the test.
 for f in $(adb shell ls /sdcard/Download/ 2>/dev/null | tr -d '\r' | grep '^panorama-'); do
