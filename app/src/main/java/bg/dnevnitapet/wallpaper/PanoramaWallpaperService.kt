@@ -129,9 +129,14 @@ class PanoramaWallpaperService : WallpaperService() {
             if (Stats.offsetEvents <= 3) Log.i(TAG, "offsets x=$xOffset step=$xOffsetStep")
             if (!launcherScrolls) {
                 // Only a launcher that reports different positions really slides; one that always
-                // says "middle" (or nothing) is handled by following the finger.
+                // says "middle" (or nothing) is handled by following the finger. A launcher that
+                // says it has several screens is believed for where it starts (e.g. the first one).
                 if (firstLauncherOffset.isNaN()) {
                     firstLauncherOffset = xOffset
+                    if (xOffsetStep > 0f && xOffsetStep < 1f) {
+                        offset = xOffset.coerceIn(0f, 1f)
+                        draw()
+                    }
                     return
                 }
                 if (abs(xOffset - firstLauncherOffset) < 0.01f) return

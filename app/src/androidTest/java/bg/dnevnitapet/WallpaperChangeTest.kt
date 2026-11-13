@@ -239,19 +239,19 @@ class WallpaperChangeTest {
         shell("screencap -p /sdcard/Download/panorama-1-home.png")
         Log.i(TAG, "panorama on the home screen: $stats")
         assertTrue("the live wallpaper never drew the picture: $stats", stats.draws > 0)
-        val start = stats.offset
-        shell("input swipe ${w * 85 / 100} ${h / 2} ${w * 15 / 100} ${h / 2} 300")
-        Thread.sleep(2000)
-        shell("screencap -p /sdcard/Download/panorama-2-after-swipe.png")
-        val afterFirst = stats.offset
-        Log.i(TAG, "panorama after a swipe to the left: $stats")
-        shell("input swipe ${w * 15 / 100} ${h / 2} ${w * 85 / 100} ${h / 2} 300")
-        Thread.sleep(2000)
-        shell("screencap -p /sdcard/Download/panorama-3-back.png")
-        Log.i(TAG, "panorama after a swipe back: $stats")
+        // Left, left, right: the picture must take more than one position.
+        val seen = mutableListOf(stats.offset)
+        for ((i, toLeft) in listOf(true, true, false).withIndex()) {
+            val (from, to) = if (toLeft) w * 85 / 100 to w * 15 / 100 else w * 15 / 100 to w * 85 / 100
+            shell("input swipe $from ${h / 2} $to ${h / 2} 300")
+            Thread.sleep(2000)
+            shell("screencap -p /sdcard/Download/panorama-${i + 2}-after-swipe.png")
+            seen += stats.offset
+            Log.i(TAG, "panorama after swipe ${i + 1} (${if (toLeft) "left" else "right"}): $stats")
+        }
         assertTrue(
-            "the picture did not slide (offset $start -> $afterFirst -> ${stats.offset}; $stats)",
-            kotlin.math.abs(afterFirst - start) > 0.05f || kotlin.math.abs(stats.offset - afterFirst) > 0.05f,
+            "the picture did not slide (offsets $seen; $stats)",
+            seen.maxOrNull()!! - seen.minOrNull()!! > 0.05f,
         )
 
         // Switching the panorama off puts a plain wallpaper back.

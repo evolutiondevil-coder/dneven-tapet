@@ -62,8 +62,11 @@ class WallpaperSetter(private val context: Context) {
         BitmapFactory.decodeFile(file.path, bounds)
         Panorama.hintSize(context, wm, sw, sh, sw, sh)
         // Set for "home and lock" in the system's preview: the lock screen gets a plain picture too.
-        val lockToo = Build.VERSION.SDK_INT >= 34 &&
+        // (the lock screen either shares the home wallpaper or has the live one itself).
+        val lockShares = runCatching { wm.getWallpaperId(WallpaperManager.FLAG_LOCK) <= 0 }.getOrDefault(false)
+        val lockIsOurs = Build.VERSION.SDK_INT >= 34 &&
             runCatching { wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK)?.packageName == context.packageName }.getOrDefault(false)
+        val lockToo = lockShares || lockIsOurs
         val flags = WallpaperManager.FLAG_SYSTEM or (if (lockToo) WallpaperManager.FLAG_LOCK else 0)
         if (bounds.outWidth.toLong() * sh > bounds.outHeight.toLong() * sw * 21 / 20) {
             middle(file, sw, sh).let { bmp ->
