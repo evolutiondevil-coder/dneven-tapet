@@ -25,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Crop
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -170,35 +173,36 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
 
     selected?.let { photo ->
         val blocked = photo.key in st.blocked
-        AlertDialog(
-            onDismissRequest = { selected = null },
-            title = { Text(photo.candidate.description.ifBlank { photo.candidate.title }) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(File(photo.file)).size(720, 1560).build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(photo.width.toFloat() / photo.height.coerceAtLeast(1) * 1.4f)
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = {
-                            vm.openCrop(photo)
-                            selected = null
-                            onOpenCrop()
-                        }) { Text("Нагласи") }
-                        if (blocked) {
-                            TextButton(onClick = { vm.unblock(photo.key); selected = null }) { Text("Покажи пак") }
-                        }
-                        TextButton(onClick = { vm.removeMine(photo.key); selected = null }) { Text("Махни") }
+        PhotoSheet(
+            image = photo,
+            title = photo.candidate.description.ifBlank { photo.candidate.title },
+            subtitle = if (blocked) "Скрита – не се показва в редуването" else "",
+            actions = listOfNotNull(
+                SheetAction(Icons.Outlined.Crop, "Нагласи") {
+                    vm.openCrop(photo)
+                    selected = null
+                    onOpenCrop()
+                },
+                if (blocked) {
+                    SheetAction(Icons.Outlined.Visibility, "Покажи") {
+                        vm.unblock(photo.key)
+                        selected = null
                     }
-                }
+                } else {
+                    null
+                },
+                SheetAction(Icons.Outlined.Delete, "Махни") {
+                    vm.removeMine(photo.key)
+                    selected = null
+                },
+            ),
+            isCurrent = photo.key == st.current?.key,
+            busy = busy,
+            onApply = {
+                vm.applyMine(photo.key)
+                selected = null
             },
-            confirmButton = {
-                Button(enabled = !busy, onClick = { vm.applyMine(photo.key); selected = null }) { Text("Сложи като тапет") }
-            },
-            dismissButton = { TextButton(onClick = { selected = null }) { Text("Затвори") } },
+            onDismiss = { selected = null },
         )
     }
 }

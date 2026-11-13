@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +16,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,7 +28,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +45,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bg.dnevnitapet.model.StoredImage
+import bg.dnevnitapet.sources.SourceRegistry
+import bg.dnevnitapet.wallpaper.MyPhotos
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
@@ -100,31 +101,35 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit) {
 
     selected?.let { image ->
         val isFavorite = st.isFavorite(image.key)
-        AlertDialog(
-            onDismissRequest = { selected = null },
-            title = { Text(image.candidate.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(File(image.file)).size(720, 1560).build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(image.width.toFloat() / image.height.coerceAtLeast(1) * 1.4f)
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = { vm.toggleFavorite(image.key); if (favorites) selected = null }) {
-                            Text(if (isFavorite) "Махни от любими" else "В любими")
-                        }
-                        TextButton(onClick = { saveToGallery(image) }) { Text("Запази") }
-                        TextButton(onClick = { info = image; selected = null }) { Text("Инфо") }
-                    }
-                }
+        PhotoSheet(
+            image = image,
+            title = image.candidate.title,
+            subtitle = listOf(
+                SourceRegistry.name(image.candidate.sourceId),
+                Format.moment(if (image.shownAt > 0) image.shownAt else image.addedAt),
+            ).filter { it.isNotBlank() }.joinToString(" · "),
+            actions = listOf(
+                SheetAction(
+                    if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    if (isFavorite) "Любима" else "Харесай",
+                    tint = if (isFavorite) Color(0xFFFF6B81) else null,
+                ) {
+                    vm.toggleFavorite(image.key)
+                    if (favorites && isFavorite) selected = null
+                },
+                SheetAction(Icons.Outlined.Download, "Запази", enabled = !MyPhotos.isMine(image.key)) { saveToGallery(image) },
+                SheetAction(Icons.Outlined.Info, "Инфо") {
+                    info = image
+                    selected = null
+                },
+            ),
+            isCurrent = image.key == st.current?.key,
+            busy = busy,
+            onApply = {
+                vm.apply(image)
+                selected = null
             },
-            confirmButton = {
-                Button(enabled = !busy, onClick = { vm.apply(image); selected = null }) { Text("Сложи като тапет") }
-            },
-            dismissButton = { TextButton(onClick = { selected = null }) { Text("Затвори") } },
+            onDismiss = { selected = null },
         )
     }
     info?.let { image -> InfoSheet(image, onDismiss = { info = null }, onSave = { saveToGallery(image) }) }

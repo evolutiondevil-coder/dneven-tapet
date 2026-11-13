@@ -332,7 +332,8 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         "Заети: ${Format.megabytes(cache)} (до 5 готови снимки, 30 в историята и любимите).",
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         OutlinedButton(onClick = vm::prepareNow) { Text("Изтегли нови сега") }
                         TextButton(onClick = vm::clearQueue) { Text("Изчисти готовите") }
                     }
