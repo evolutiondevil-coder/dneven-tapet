@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
@@ -54,7 +55,7 @@ import java.io.File
 /** History (last ~30 wallpapers) or favourites, as a grid of thumbnails. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit) {
+fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, onOpenCrop: () -> Unit) {
     val st by vm.library.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -116,6 +117,11 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit) {
                 ) {
                     vm.toggleFavorite(image.key)
                     if (favorites && isFavorite) selected = null
+                },
+                SheetAction(Icons.Outlined.Crop, "Нагласи", enabled = !busy) {
+                    vm.openCrop(image)
+                    selected = null
+                    onOpenCrop()
                 },
                 SheetAction(Icons.Outlined.Download, "Запази", enabled = !MyPhotos.isMine(image.key)) { saveToGallery(image) },
                 SheetAction(Icons.Outlined.Info, "Инфо") {

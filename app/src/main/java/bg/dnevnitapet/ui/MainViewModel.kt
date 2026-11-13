@@ -472,7 +472,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (r is ChangeResult.Changed) {
                     say(
                         if (library.value.current?.key == ready.image.key) "Тапетът е обновен с новото изрязване"
-                        else "Изрязването е запазено – натисни „Избери“, за да го сложиш",
+                        else "Изрязването е запазено – сложи снимката като тапет, когато поискаш",
                     )
                     closeCrop()
                     onDone()

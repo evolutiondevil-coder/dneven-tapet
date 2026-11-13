@@ -38,8 +38,14 @@ class MainActivity : ComponentActivity() {
                             screen = Screen.CROP
                         },
                     )
-                    Screen.HISTORY -> ImageGridScreen(vm, favorites = false, onBack = { screen = Screen.HOME })
-                    Screen.FAVORITES -> ImageGridScreen(vm, favorites = true, onBack = { screen = Screen.HOME })
+                    Screen.HISTORY -> ImageGridScreen(vm, favorites = false, onBack = { screen = Screen.HOME }, onOpenCrop = {
+                        cropFrom = Screen.HISTORY
+                        screen = Screen.CROP
+                    })
+                    Screen.FAVORITES -> ImageGridScreen(vm, favorites = true, onBack = { screen = Screen.HOME }, onOpenCrop = {
+                        cropFrom = Screen.FAVORITES
+                        screen = Screen.CROP
+                    })
                     Screen.SETTINGS -> SettingsScreen(vm, onBack = { screen = Screen.HOME }, onOpenMyPhotos = { screen = Screen.MY_PHOTOS })
                     Screen.CROP -> CropScreen(vm, onClose = { screen = cropFrom })
                 }
