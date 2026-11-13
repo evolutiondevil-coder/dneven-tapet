@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -53,8 +54,11 @@ import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -80,8 +84,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -244,25 +250,25 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
 
         AnimatedVisibility(visible = !immersive, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
-                // Scrims keep the text readable on any picture (they do not block swipes or taps).
+                // Light scrims only behind the text: most of the picture stays clear (they do not block swipes or taps).
                 Box(
-                    Modifier.fillMaxWidth().height(140.dp)
-                        .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent))),
+                    Modifier.fillMaxWidth().height(110.dp)
+                        .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.38f), Color.Transparent))),
                 )
                 Box(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(480.dp)
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f)))),
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (settings.onboarded) 300.dp else 480.dp)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.62f)))),
                 )
 
                 Row(
-                    Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         "Дневен тапет",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 12.dp).weight(1f),
+                        color = Color.White.copy(alpha = 0.92f),
+                        style = MaterialTheme.typography.titleMedium.copy(shadow = TextShadow),
+                        modifier = Modifier.padding(start = 16.dp).weight(1f),
                     )
                     IconButton(onClick = { onNavigate(Screen.HISTORY) }) {
                         Icon(Icons.Filled.History, contentDescription = "История", tint = Color.White)
@@ -280,7 +286,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
 
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
-                        .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+                        .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
                 ) {
                     if (!settings.onboarded) {
                         Onboarding(unrestricted, busy, onAllow = { Power.requestUnrestricted(context) }, onStart = vm::startOnboarding)
@@ -291,95 +297,146 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                             onClick = { onNavigate(Screen.SETTINGS) },
                             shape = RoundedCornerShape(50),
                             color = Color(0xCC5A3B00),
-                            modifier = Modifier.padding(bottom = 12.dp),
+                            modifier = Modifier.padding(bottom = 10.dp),
                         ) {
-                            Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Warning, null, tint = Color(0xFFFFD58A), modifier = Modifier.size(18.dp))
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Warning, null, tint = Color(0xFFFFD58A), modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Телефонът може да спира смяната – настрой", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                                Text("Телефонът може да спира смяната – настрой", color = Color.White, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
 
-                    if (shown != null) {
-                        Surface(
-                            onClick = vm::showCurrent,
-                            enabled = !isCurrent,
-                            shape = RoundedCornerShape(50),
-                            color = if (isCurrent) Color.White.copy(alpha = 0.16f) else Color(0xCC2D5DA8),
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        ) {
-                            Text(
-                                if (isCurrent) position else "$position  ·  към сегашния",
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                            )
+                    // Line 1: which picture this is, and "Задръж" / "Пусни".
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f).padding(end = 8.dp)) {
+                            if (shown != null && !isCurrent) {
+                                Surface(onClick = vm::showCurrent, shape = RoundedCornerShape(50), color = Color(0xCC2D5DA8)) {
+                                    Text(
+                                        "$position  ·  към сегашния",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                    )
+                                }
+                            } else if (shown != null) {
+                                Text(
+                                    position,
+                                    color = Color.White.copy(alpha = 0.88f),
+                                    style = MaterialTheme.typography.labelLarge.copy(shadow = TextShadow),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
-                        Text(
-                            shown.candidate.title,
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        val subtitle = shown.candidate.location.ifBlank { shown.candidate.description }
-                        if (subtitle.isNotBlank() && subtitle != shown.candidate.title) {
+                        HoldChip(held = !settings.autoChange, onClick = vm::toggleHold)
+                    }
+
+                    if (shown != null) {
+                        // Line 2: the title, "любима" and everything else behind "⋯".
+                        var menuOpen by remember { mutableStateOf(false) }
+                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                subtitle,
-                                color = Color.White.copy(alpha = 0.85f),
-                                style = MaterialTheme.typography.bodyMedium,
+                                shown.candidate.title,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge.copy(shadow = TextShadow),
+                                fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = 4.dp),
+                                modifier = Modifier.weight(1f),
                             )
+                            val isFavorite = st.isFavorite(shown.key)
+                            IconButton(onClick = { vm.toggleFavorite(shown.key) }) {
+                                Icon(
+                                    if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                    contentDescription = if (isFavorite) "Махни от любими" else "Добави в любими",
+                                    tint = if (isFavorite) Color(0xFFFF8A95) else Color.White,
+                                )
+                            }
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = "Още", tint = Color.White)
+                                }
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Информация за снимката") },
+                                        leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
+                                        onClick = {
+                                            menuOpen = false
+                                            showInfo = true
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Нагласи изрязването") },
+                                        leadingIcon = { Icon(Icons.Filled.Crop, contentDescription = null) },
+                                        enabled = !busy,
+                                        onClick = {
+                                            menuOpen = false
+                                            vm.openCrop(shown)
+                                            onNavigate(Screen.CROP)
+                                        },
+                                    )
+                                    if (!shownIsMine) {
+                                        DropdownMenuItem(
+                                            text = { Text("Запази в галерията") },
+                                            leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
+                                            onClick = {
+                                                menuOpen = false
+                                                saveToGallery(shown)
+                                            },
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text("Не показвай повече") },
+                                        leadingIcon = { Icon(Icons.Filled.Block, contentDescription = null) },
+                                        enabled = !busy,
+                                        onClick = {
+                                            menuOpen = false
+                                            vm.block(shown.key)
+                                        },
+                                    )
+                                    HorizontalDivider()
+                                    val next = remember(st.lastChangeAt, settings, resumeTick) { vm.nextPlanned() }
+                                    Text(
+                                        when {
+                                            !settings.autoChange -> "Тапетът е задържан – не се сменя сам"
+                                            next != null -> "Следваща смяна: " + Format.moment(next)
+                                            else -> "Готови снимки: ${st.queue.size}"
+                                        },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    )
+                                }
+                            }
                         }
+                        // Line 3: where it comes from.
                         Text(
                             listOf(SourceRegistry.name(shown.candidate.sourceId), shown.candidate.author)
                                 .filter { it.isNotBlank() }.joinToString(" · "),
-                            color = Color.White.copy(alpha = 0.65f),
-                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.75f),
+                            style = MaterialTheme.typography.labelMedium.copy(shadow = TextShadow),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 4.dp),
                         )
                     } else {
                         Text(
                             if (loadingMore || busy) "Изтеглям снимки…" else "Няма повече готови снимки",
                             color = Color.White,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleMedium.copy(shadow = TextShadow),
+                            modifier = Modifier.padding(top = 6.dp),
                         )
                     }
 
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val isFavorite = shown != null && st.isFavorite(shown.key)
-                        RoundAction(
-                            if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            if (isFavorite) "Махни от любими" else "Добави в любими",
-                            enabled = shown != null,
-                            tint = if (isFavorite) Color(0xFFFF6B81) else Color.White,
-                        ) { shown?.let { vm.toggleFavorite(it.key) } }
-                        RoundAction(Icons.Filled.Block, "Не показвай повече", enabled = shown != null && !busy) {
-                            shown?.let { vm.block(it.key) }
-                        }
-                        RoundAction(Icons.Filled.Info, "Информация за снимката", enabled = shown != null) { showInfo = true }
-                        RoundAction(Icons.Filled.Crop, "Нагласи изрязването", enabled = shown != null && !busy) {
-                            shown?.let {
-                                vm.openCrop(it)
-                                onNavigate(Screen.CROP)
-                            }
-                        }
-                        RoundAction(Icons.Filled.Download, "Запази в галерията", enabled = shown != null && !shownIsMine) {
-                            shown?.let { saveToGallery(it) }
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        NavButton("Предишна", Icons.AutoMirrored.Filled.ArrowBack, iconFirst = true, loading = false, modifier = Modifier.weight(1f)) {
+                    // Line 4: ‹  Избери / Това е тапетът ти  ›
+                    Row(
+                        Modifier.padding(top = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        RoundNav(Icons.AutoMirrored.Filled.ArrowBack, "Предишна", loading = false) {
                             bg.dnevnitapet.util.Diag.i("tap Предишна page=${pagerState.currentPage} size=${list.size}")
                             if (pagerState.currentPage > 0) {
                                 scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
@@ -387,76 +444,37 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                 vm.hint("Това е най-старата снимка в историята")
                             }
                         }
-                        NavButton("Следваща", Icons.AutoMirrored.Filled.ArrowForward, iconFirst = false, loading = loadingMore, modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = {
+                                bg.dnevnitapet.util.Diag.i("tap Избери page=${pagerState.currentPage} shown=${shown?.key}")
+                                shown?.let { vm.choose(it.key) }
+                            },
+                            enabled = shown != null && !isCurrent && !busy,
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.White,
+                                contentColor = Color.Black,
+                                disabledContainerColor = Color.White.copy(alpha = 0.18f),
+                                disabledContentColor = Color.White.copy(alpha = 0.9f),
+                            ),
+                        ) {
+                            when {
+                                busy -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = if (isCurrent) Color.White else Color.Black)
+                                isCurrent -> {
+                                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Това е тапетът ти", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                                }
+                                else -> Text("Избери", maxLines = 1, softWrap = false, style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                        RoundNav(Icons.AutoMirrored.Filled.ArrowForward, "Следваща", loading = loadingMore) {
                             bg.dnevnitapet.util.Diag.i("tap Следваща page=${pagerState.currentPage} size=${list.size} scrolling=${pagerState.isScrollInProgress}")
                             if (pagerState.currentPage < list.size) {
                                 scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                             } else {
                                 vm.loadMore()
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Button(
-                        onClick = {
-                            bg.dnevnitapet.util.Diag.i("tap Избери page=${pagerState.currentPage} shown=${shown?.key}")
-                            shown?.let { vm.choose(it.key) }
-                        },
-                        enabled = shown != null && !isCurrent && !busy,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black,
-                            disabledContainerColor = Color.White.copy(alpha = 0.18f),
-                            disabledContentColor = Color.White.copy(alpha = 0.8f),
-                        ),
-                    ) {
-                        when {
-                            busy -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black)
-                            isCurrent -> {
-                                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Това е тапетът ти", maxLines = 1, softWrap = false, style = MaterialTheme.typography.titleSmall)
-                            }
-                            else -> Text("Избери", maxLines = 1, softWrap = false, style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                    val next = remember(st.lastChangeAt, settings, resumeTick) { vm.nextPlanned() }
-                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            when {
-                                !settings.autoChange -> "Тапетът е задържан – не се сменя сам"
-                                next != null -> "Следваща смяна: " + Format.moment(next)
-                                else -> "Готови снимки: ${st.queue.size}"
-                            },
-                            color = Color.White.copy(alpha = 0.7f),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        // "Задръж": keep the wallpaper you like; the automatic change pauses.
-                        Surface(
-                            onClick = vm::toggleHold,
-                            shape = RoundedCornerShape(50),
-                            color = if (settings.autoChange) Color.Black.copy(alpha = 0.38f) else Color(0xCC2D5DA8),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
-                        ) {
-                            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    if (settings.autoChange) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    if (settings.autoChange) "Задръж" else "Пусни",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                )
                             }
                         }
                     }
@@ -531,56 +549,52 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-/** "Предишна" / "Следваща": label on one line, never wrapped. */
+/** Soft shadow under white text, so it stays readable on light pictures without a dark band. */
+private val TextShadow = Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 1.5f), 6f)
+
+/** "Предишна" / "Следваща": round arrow buttons beside the main button. */
 @Composable
-private fun NavButton(
-    label: String,
-    icon: ImageVector,
-    iconFirst: Boolean,
-    loading: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    OutlinedButton(
+private fun RoundNav(icon: ImageVector, description: String, loading: Boolean, onClick: () -> Unit) {
+    Surface(
         onClick = onClick,
-        modifier = modifier.height(48.dp),
-        contentPadding = PaddingValues(horizontal = 12.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.Black.copy(alpha = 0.3f), contentColor = Color.White),
+        shape = CircleShape,
+        color = Color.Black.copy(alpha = 0.42f),
+        modifier = Modifier.size(52.dp).semantics { contentDescription = description },
     ) {
-        if (iconFirst) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-        }
-        Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
-        if (!iconFirst) {
-            Spacer(Modifier.width(6.dp))
+        Box(contentAlignment = Alignment.Center) {
             if (loading) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
             } else {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(icon, contentDescription = null, tint = Color.White)
             }
         }
     }
 }
 
+/** "Задръж": keep the wallpaper you like (the automatic change pauses); "Пусни" resumes it. */
 @Composable
-private fun RoundAction(
-    icon: ImageVector,
-    description: String,
-    enabled: Boolean = true,
-    tint: Color = Color.White,
-    onClick: () -> Unit,
-) {
+private fun HoldChip(held: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        enabled = enabled,
-        shape = CircleShape,
-        color = Color.Black.copy(alpha = 0.38f),
-        modifier = Modifier.padding(end = 10.dp).size(46.dp).semantics { contentDescription = description },
+        shape = RoundedCornerShape(50),
+        color = if (held) Color(0xCC2D5DA8) else Color.Black.copy(alpha = 0.3f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = if (held) 0.6f else 0.4f)),
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = if (enabled) tint else tint.copy(alpha = 0.4f))
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (held) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                if (held) "Пусни" else "Задръж",
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }

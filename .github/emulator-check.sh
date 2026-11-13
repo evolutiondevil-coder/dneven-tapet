@@ -44,7 +44,7 @@ expect_changed() {
 has_text() {
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1
   adb pull /sdcard/ui.xml /tmp/ui.xml > /dev/null 2>&1
-  grep -q "text=\"$1\"" /tmp/ui.xml
+  grep -qE "(text|content-desc)=\"$1\"" /tmp/ui.xml
 }
 
 status=0
@@ -107,13 +107,13 @@ if has_text "Следваща"; then echo "OK: second tap brings the controls ba
 
 # "Задръж" pauses the automatic change, "Пусни" resumes it.
 tap "Задръж" && shot 03l-held 3
-if has_text "Тапетът е задържан – не се сменя сам"; then echo "OK: Задръж holds the wallpaper"; else echo "FAIL: Задръж did not hold"; fi | tee -a "$OUT/summary.txt"
+if has_text "Пусни"; then echo "OK: Задръж holds the wallpaper"; else echo "FAIL: Задръж did not hold"; fi | tee -a "$OUT/summary.txt"
 tap "Пусни"
 sleep 2
 
 # Crop editor on the current wallpaper: move the picture, "Готово" re-cuts and sets it.
 w5=$(wallpaper_state)
-tap "Нагласи изрязването" && shot 03m-crop-editor 12
+tap "Още" && sleep 1 && shot 03l2-more-menu 1 && tap "Нагласи изрязването" && shot 03m-crop-editor 12
 adb shell input swipe 300 1200 700 1150 600
 shot 03n-crop-moved 2
 tap "Готово" && shot 03o-after-crop 8
@@ -133,7 +133,7 @@ adb shell settings put system font_scale 1.0
 adb shell wm density reset
 sleep 3
 
-tap "Информация за снимката" && shot 04-info-sheet 3
+tap "Още" && sleep 1 && tap "Информация за снимката" && shot 04-info-sheet 3
 adb shell input keyevent KEYCODE_BACK
 sleep 2
 tap "Настройки" && shot 05-settings 3
