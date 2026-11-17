@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -81,6 +82,7 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
     val busy by vm.busy.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var selected by remember { mutableStateOf<StoredImage?>(null) }
+    val context = LocalContext.current
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
 
     val pickPhotos = rememberPhotoPicker(vm)
@@ -190,6 +192,9 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
                     }
                 } else {
                     null
+                },
+                SheetAction(Icons.Outlined.Share, "Сподели") {
+                    if (!Share.share(context, photo)) vm.hint("Няма приложение, с което да се сподели")
                 },
                 SheetAction(Icons.Outlined.Delete, "Махни") {
                     vm.removeMine(photo.key)

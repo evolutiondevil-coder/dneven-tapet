@@ -101,6 +101,10 @@ data class LibraryState(
     val myPhotos: List<StoredImage> = emptyList(),
     /** Own photos still to come in the current round, in order (each round is shuffled). */
     val myRotation: List<String> = emptyList(),
+    /** The lock screen's own picture ("Различни снимки на двата екрана"). */
+    val lockCurrent: StoredImage? = null,
+    /** Hidden pictures whose details are known, for learning the taste. Newest last. */
+    val disliked: List<Candidate> = emptyList(),
 ) {
     fun isFavorite(key: String) = favorites.any { it.key == key }
 }
@@ -135,6 +139,16 @@ data class Settings(
     val panorama: Boolean = false,
     /** How wide the panorama is, in screen widths. */
     val panoramaScreens: Float = 2f,
+    /** The picture moves a little when the phone is tilted (live wallpaper). */
+    val tilt: Boolean = false,
+    /** Darker (and optionally blurred) home-screen picture, so icons and labels stand out. */
+    val readableIcons: ReadableMode = ReadableMode.OFF,
+    /** In the evening and at night the home-screen picture is dimmed a little. */
+    val eveningDim: Boolean = false,
+    /** With "И двата": the lock screen gets a different picture at every change. */
+    val lockDifferent: Boolean = false,
+    /** Prefer the sources and kinds of pictures the user likes (♥) and not the hidden ones. */
+    val learnTaste: Boolean = true,
     val frequency: FrequencyMode = FrequencyMode.DAILY,
     /** Minutes after midnight for the daily change. */
     val dailyMinuteOfDay: Int = 5 * 60,
@@ -149,4 +163,14 @@ data class Settings(
 ) {
     /** Panorama that actually applies: only the home screen slides. */
     val panoramaOn: Boolean get() = panorama && target != WallpaperTarget.LOCK
+
+    /** The home screen is drawn by the app's own live wallpaper (panorama or an effect is on). */
+    val liveOn: Boolean
+        get() = target != WallpaperTarget.LOCK && (panorama || tilt || readableIcons != ReadableMode.OFF || eveningDim)
+
+    /** The lock screen gets its own picture. */
+    val lockSeparate: Boolean get() = target == WallpaperTarget.BOTH && lockDifferent
 }
+
+@Serializable
+enum class ReadableMode { OFF, DIM, DIM_BLUR }

@@ -22,11 +22,11 @@ import kotlin.math.min
 /** Sets the system wallpaper from a prepared file. */
 class WallpaperSetter(private val context: Context) {
     /**
-     * @param panorama the panorama is on: while the app's live wallpaper is on the home screen it
-     * only gets the new file (and slides it); the lock screen gets the middle part.
+     * @param live the app's live wallpaper is wanted (panorama or an effect): while it is on the home
+     * screen it only gets the new file; the lock screen gets the middle part of a wide picture.
      * @return the system's id of the new wallpaper (> 0 on success).
      */
-    fun apply(file: File, target: WallpaperTarget, panorama: Boolean = false): Int {
+    fun apply(file: File, target: WallpaperTarget, live: Boolean = false): Int {
         val wm = WallpaperManager.getInstance(context)
         if (!wm.isWallpaperSupported || !wm.isSetWallpaperAllowed) {
             throw IllegalStateException("Устройството не позволява смяна на тапета")
@@ -39,7 +39,7 @@ class WallpaperSetter(private val context: Context) {
         val wide = bounds.outWidth.toLong() * sh > bounds.outHeight.toLong() * sw * 21 / 20
         if (target != WallpaperTarget.LOCK) Panorama.setFile(context, file.path)
 
-        if (panorama && target != WallpaperTarget.LOCK && Panorama.isActive(context)) {
+        if (live && target != WallpaperTarget.LOCK && Panorama.isActive(context)) {
             // The home screen is drawn by the panorama live wallpaper, which reloads by itself.
             if (target == WallpaperTarget.BOTH) setLock(wm, file, wide, sw, sh)
             return max(1, wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM))

@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bg.dnevnitapet.BuildConfig
 import bg.dnevnitapet.model.Category
 import bg.dnevnitapet.model.FrequencyMode
+import bg.dnevnitapet.model.ReadableMode
 import bg.dnevnitapet.model.Settings
 import bg.dnevnitapet.model.SourceStatus
 import bg.dnevnitapet.model.WallpaperTarget
@@ -90,13 +91,14 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     val unrestricted = remember(tick) { Power.isUnrestricted(context) }
     val dataSaver = remember(tick) { Power.dataSaverBlocksBackground(context) }
     val exact = remember(tick) { vm.canScheduleExact() }
-    val panoramaActive = remember(tick, s.panorama) { Panorama.isActive(context) }
+    val liveActive = remember(tick, s.liveOn) { Panorama.isActive(context) }
     val busy by vm.busy.collectAsStateWithLifecycle()
     val importing by vm.importing.collectAsStateWithLifecycle()
     val pickPhotos = rememberPhotoPicker(vm)
     val openPanorama = {
-        if (!Panorama.openPicker(context)) vm.hint("Телефонът няма екран за живи тапети – панорамата не може да се включи.")
+        if (!Panorama.openPicker(context)) vm.hint("Телефонът няма екран за живи тапети – ефектите не могат да се включат.")
     }
+    val askLive = { if (!Panorama.isActive(context)) openPanorama() }
     var unusedPause by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(tick) {
         unusedPause = withContext(Dispatchers.IO) { Power.unusedAppPauseActive(context) }
@@ -129,6 +131,24 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     }
                 }
             }
+            item {
+                SwitchRow(
+                    "Учи вкуса ми",
+                    "Снимки, подобни на любимите ти (♥), идват по-често, а като скритите – по-рядко",
+                    s.learnTaste,
+                ) { v -> update { it.copy(learnTaste = v) } }
+            }
+            if (s.learnTaste) {
+                item {
+                    val summary = remember(st.favorites.size, st.blocked.size) { vm.tasteSummary() }
+                    Text(
+                        summary.ifBlank { "Още няма какво да науча – добавяй любими с ♥ или скривай снимки, които не харесваш." },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
 
             item { Header("Къде да се слага") }
             item {
@@ -136,26 +156,33 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     RadioRow("Начален екран", s.target == WallpaperTarget.HOME) { update { it.copy(target = WallpaperTarget.HOME) } }
                     RadioRow("Заключен екран", s.target == WallpaperTarget.LOCK) { update { it.copy(target = WallpaperTarget.LOCK) } }
                     RadioRow("И двата", s.target == WallpaperTarget.BOTH) { update { it.copy(target = WallpaperTarget.BOTH) } }
+                    if (s.target == WallpaperTarget.BOTH) {
+                        SwitchRow(
+                            "Различни снимки на двата екрана",
+                            "При всяка смяна заключеният екран получава друга снимка от началния",
+                            s.lockDifferent,
+                        ) { v -> update { it.copy(lockDifferent = v) } }
+                    }
                     if (s.target != WallpaperTarget.HOME) {
                         Hint("Ако телефонът ти сам сменя заключения екран (напр. „Динамичен заключен екран“ на Samsung или „Карусел“ на Xiaomi), той ще бъде заменен от тази снимка.")
                     }
                 }
             }
 
-            item { Header("Панорама") }
+            item { Header("Начален екран: панорама и ефекти") }
             item {
                 SwitchRow(
-                    "Снимката продължава между екраните",
+                    "Панорама: снимката продължава между екраните",
                     "Тапетът е по-широк от екрана: плъзгаш наляво или надясно по началния екран и снимката се движи заедно с екраните",
                     s.panorama,
-                ) { v -> vm.setPanorama(v) { if (!Panorama.isActive(context)) openPanorama() } }
+                ) { v -> vm.setPanorama(v, askLive) }
             }
             if (s.panorama) {
                 item {
                     Column(Modifier.padding(horizontal = 16.dp)) {
                         Text("Колко широка:", style = MaterialTheme.typography.bodyMedium)
                         @OptIn(ExperimentalLayoutApi::class)
-                        FlowRow(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(Modifier.padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(1.5f to "1,5 екрана", 2f to "2 екрана", 3f to "3 екрана").forEach { (w, label) ->
                                 FilterChip(
                                     selected = s.panoramaScreens == w,
@@ -165,19 +192,64 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                                 )
                             }
                         }
-                        StatusRow(
-                            ok = panoramaActive,
-                            title = if (panoramaActive) "Панорамата е на началния екран" else "Остава една стъпка",
-                            text = if (panoramaActive) "Плъзгай между екраните – снимката се движи с тях."
-                            else "Натисни „Включи“ и в прегледа избери „Задай тапет“ (на Samsung „Задаване“) → „Начален екран“. Прави се само веднъж.",
-                            action = if (panoramaActive) null else ("Включи" to openPanorama),
+                        Hint("Ако снимката не се мести сама при смяна на екраните, тя следва пръста ти: плъзни наляво или надясно по празно място. Вертикалните снимки остават с размера на екрана.")
+                    }
+                }
+            }
+            item {
+                SwitchRow(
+                    "Движение при накланяне",
+                    "Снимката леко се отмества, когато наклониш телефона – като 3D ефект",
+                    s.tilt,
+                ) { v -> vm.setLiveOption({ it.copy(tilt = v) }, askLive) }
+            }
+            item {
+                SwitchRow(
+                    "По-четливи икони",
+                    "Тапетът на началния екран е леко затъмнен, за да се виждат по-добре иконите и надписите",
+                    s.readableIcons != ReadableMode.OFF,
+                ) { v -> vm.setLiveOption({ it.copy(readableIcons = if (v) ReadableMode.DIM else ReadableMode.OFF) }, askLive) }
+            }
+            if (s.readableIcons != ReadableMode.OFF) {
+                item {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = s.readableIcons == ReadableMode.DIM,
+                            onClick = { update { it.copy(readableIcons = ReadableMode.DIM) } },
+                            label = { Text("Затъмни") },
                         )
-                        Hint("Ако на твоя телефон снимката не се мести сама при смяна на екраните, тя следва пръста ти: плъзни наляво или надясно по празно място на началния екран.")
-                        Hint("Вертикалните снимки (и някои твои снимки) са тесни – те остават с размера на екрана.")
+                        FilterChip(
+                            selected = s.readableIcons == ReadableMode.DIM_BLUR,
+                            onClick = { update { it.copy(readableIcons = ReadableMode.DIM_BLUR) } },
+                            label = { Text("Затъмни и размажи") },
+                        )
+                    }
+                }
+            }
+            item {
+                SwitchRow(
+                    "Вечер по-тъмно",
+                    "От 19:30 тапетът постепенно потъмнява, за да не блести; сутрин към 7:00 е пак нормален",
+                    s.eveningDim,
+                ) { v -> vm.setLiveOption({ it.copy(eveningDim = v) }, askLive) }
+            }
+            if (s.panorama || s.tilt || s.readableIcons != ReadableMode.OFF || s.eveningDim) {
+                item {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                         if (s.target == WallpaperTarget.LOCK) {
-                            Hint("Панорамата е само за началния екран – избери горе „Начален екран“ или „И двата“.")
-                        } else if (s.target == WallpaperTarget.BOTH) {
-                            Hint("На заключения екран се слага средата на снимката.")
+                            Hint("Тези ефекти са за началния екран – избери горе „Начален екран“ или „И двата“.")
+                        } else {
+                            StatusRow(
+                                ok = liveActive,
+                                title = if (liveActive) "Ефектите работят на началния екран" else "Остава една стъпка",
+                                text = if (liveActive) "Тапетът се рисува от приложението, затова може да се движи и затъмнява."
+                                else "Натисни „Включи“ и в прегледа избери „Задай тапет“ (на Samsung „Задаване“) → „Начален екран“. Прави се само веднъж.",
+                                action = if (liveActive) null else ("Включи" to openPanorama),
+                            )
+                            if (s.target == WallpaperTarget.BOTH) {
+                                Hint("На заключения екран снимката е без ефекти (средата ѝ при панорама).")
+                            }
                         }
                     }
                 }

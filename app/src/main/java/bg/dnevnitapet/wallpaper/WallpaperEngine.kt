@@ -12,6 +12,7 @@ import bg.dnevnitapet.model.PhotoMode
 import bg.dnevnitapet.model.Settings
 import bg.dnevnitapet.model.SourceStatus
 import bg.dnevnitapet.model.StoredImage
+import bg.dnevnitapet.model.WallpaperTarget
 import bg.dnevnitapet.net.Http
 import bg.dnevnitapet.sources.CategoryClassifier
 import bg.dnevnitapet.sources.FetchRequest
@@ -84,7 +85,10 @@ class WallpaperEngine(
             val mode = settings.value.photoMode
             val st0 = library.value
             if (MyPhotos.useMineNext(mode, st0.current?.key, usableMine(st0).isNotEmpty())) {
-                nextMineLocked(trigger)?.let { return@withContext it }
+                nextMineLocked(trigger)?.let { r ->
+                    if (r is ChangeResult.Changed) changeLockLocked()
+                    return@withContext r
+                }
                 if (mode == PhotoMode.MINE) {
                     log("Няма добавени собствени снимки – тапетът остава същият")
                     return@withContext ChangeResult.NoImage
@@ -100,7 +104,7 @@ class WallpaperEngine(
                 return@withContext ChangeResult.NoImage
             }
             try {
-                setter.apply(File(item.file), settings.value.target, settings.value.panoramaOn)
+                setter.apply(File(item.file), homeTarget(), settings.value.liveOn)
             } catch (e: Exception) {
                 library.update { it.copy(queue = listOf(item) + it.queue) }
                 log("Грешка при смяна на тапета: ${describe(e)}")
@@ -108,8 +112,58 @@ class WallpaperEngine(
             }
             val shown = commitShown(item, trigger)
             pingUnsplash(item.candidate)
+            changeLockLocked()
             onChanged?.invoke()
             ChangeResult.Changed(shown)
+        }
+    }
+
+    /** Where the home-screen picture goes: with a separate lock picture, only the home screen. */
+    private fun homeTarget(): WallpaperTarget =
+        if (settings.value.lockSeparate) WallpaperTarget.HOME else settings.value.target
+
+    /**
+     * "Различни снимки на двата екрана": the lock screen gets another prepared picture (or, with
+     * own photos, the next own photo). Caller holds [changeMutex]. Failures only go to the log.
+     */
+    private suspend fun changeLockLocked() {
+        val s = settings.value
+        if (!s.lockSeparate) return
+        val st = library.value
+        val album = usableMine(st)
+        val mineNext = { MyPhotos.nextKey(album.map { it.key }, st.myRotation, st.current?.key) }
+        var rotationAfter: List<String>? = null
+        val item: StoredImage? = when (s.photoMode) {
+            PhotoMode.MINE -> mineNext()?.let { (key, rest) -> rotationAfter = rest; album.first { it.key == key } }
+            else -> takeFromQueue(preferFresh = false)
+                ?: if (s.photoMode == PhotoMode.MIXED) mineNext()?.let { (key, rest) -> rotationAfter = rest; album.first { it.key == key } } else null
+        }
+        if (item == null) {
+            log("Заключен екран: няма друга готова снимка – остава същата")
+            return
+        }
+        try {
+            setter.apply(File(item.file), WallpaperTarget.LOCK, live = false)
+        } catch (e: Exception) {
+            if (!MyPhotos.isMine(item.key)) library.update { it.copy(queue = listOf(item) + it.queue) }
+            log("Заключен екран: ${describe(e)}")
+            return
+        }
+        library.update {
+            it.copy(
+                lockCurrent = item.copy(shownAt = clock()),
+                myRotation = rotationAfter ?: it.myRotation,
+                seen = (it.seen + item.key).distinct().takeLast(SEEN_LIMIT),
+                log = appendLog(it.log, "Заключен екран: " + item.candidate.title),
+            )
+        }
+    }
+
+    /** All effects and the panorama were switched off: the home screen gets a plain wallpaper again. */
+    suspend fun leaveLive() = changeMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val file = library.value.current?.file?.let(::File)?.takeIf { it.exists() } ?: return@withContext
+            runCatching { setter.leavePanorama(file) }.onFailure { log("Грешка при смяна на тапета: ${describe(it)}") }
         }
     }
 
@@ -129,7 +183,7 @@ class WallpaperEngine(
         imagesDir.mkdirs()
         src.copyTo(copy, overwrite = true)
         try {
-            setter.apply(copy, settings.value.target, settings.value.panoramaOn)
+            setter.apply(copy, homeTarget(), settings.value.liveOn)
         } catch (e: Exception) {
             copy.delete()
             log("Грешка при смяна на тапета: ${describe(e)}")
@@ -259,7 +313,7 @@ class WallpaperEngine(
             val item = queue[index]
             if (!File(item.file).exists()) return@withContext ChangeResult.Failed("Файлът на снимката липсва")
             try {
-                setter.apply(File(item.file), settings.value.target, settings.value.panoramaOn)
+                setter.apply(File(item.file), homeTarget(), settings.value.liveOn)
             } catch (e: Exception) {
                 log("Грешка при смяна на тапета: ${describe(e)}")
                 return@withContext ChangeResult.Failed(describe(e))
@@ -336,8 +390,11 @@ class WallpaperEngine(
     /** "Never show again": remembers the picture and, if it is on screen now, moves on. */
     suspend fun block(key: String): ChangeResult? {
         library.update { st ->
+            val known = (listOfNotNull(st.current, st.lockCurrent) + st.history + st.queue).firstOrNull { it.key == key }?.candidate
+                ?: st.pool.firstOrNull { it.key == key }
             st.copy(
                 blocked = st.blocked + key,
+                disliked = if (known == null) st.disliked else (st.disliked.filter { it.key != key } + known).takeLast(DISLIKED_LIMIT),
                 queue = st.queue.filter { it.key != key },
                 history = st.history.filter { it.key != key },
                 log = appendLog(st.log, "Скрита завинаги: " + (st.current?.takeIf { it.key == key }?.candidate?.title ?: key)),
@@ -347,7 +404,7 @@ class WallpaperEngine(
     }
 
     suspend fun unblock(key: String) {
-        library.update { it.copy(blocked = it.blocked - key) }
+        library.update { it.copy(blocked = it.blocked - key, disliked = it.disliked.filter { c -> c.key != key }) }
     }
 
     /** Last time the user browsed ahead in the app; extra prepared pictures are kept meanwhile. */
@@ -423,7 +480,7 @@ class WallpaperEngine(
             val isCurrent = st.current?.key == key
             if (isCurrent) {
                 try {
-                    setter.apply(dest, settings.value.target, settings.value.panoramaOn)
+                    setter.apply(dest, homeTarget(), settings.value.liveOn)
                 } catch (e: Exception) {
                     return@withContext ChangeResult.Failed(describe(e))
                 }
@@ -463,9 +520,9 @@ class WallpaperEngine(
     /**
      * The panorama was switched on or off (or made wider): the prepared pictures are thrown away
      * (they are refilled in the new size), the own photos and the current wallpaper are cut again.
-     * @param wasPanorama the panorama was on before the change.
+     * @param wasLive the app's live wallpaper was wanted before the change.
      */
-    suspend fun refitForPanorama(wasPanorama: Boolean): ChangeResult? = changeMutex.withLock {
+    suspend fun refitForPanorama(wasLive: Boolean): ChangeResult? = changeMutex.withLock {
         withContext(Dispatchers.IO) {
             library.update { it.copy(queue = emptyList()) }
             val (tw, th, maxW) = sizes()
@@ -513,8 +570,8 @@ class WallpaperEngine(
                 val file = File(remade?.file ?: current.file)
                 result = try {
                     val s = settings.value
-                    if (wasPanorama && !s.panoramaOn) setter.leavePanorama(file)
-                    if (remade != null || s.panoramaOn) setter.apply(file, s.target, s.panoramaOn)
+                    if (wasLive && !s.liveOn) setter.leavePanorama(file)
+                    if (remade != null || s.liveOn) setter.apply(file, homeTarget(), s.liveOn)
                     if (remade != null) library.update { it.copy(current = remade) }
                     onChanged?.invoke()
                     ChangeResult.Changed(remade ?: current)
@@ -637,20 +694,21 @@ class WallpaperEngine(
             c.key !in st.blocked && CategoryClassifier.isAllowed(c, s.enabledCategories)
     }
 
-    /** Takes turns between sources; within a source, newest pictures first. */
+    /** The taste learned from the favourites and the hidden pictures (neutral when switched off). */
+    fun tasteProfile(st: LibraryState = library.value, s: Settings = settings.value): Taste.Profile =
+        if (!s.learnTaste) Taste.NEUTRAL else Taste.profile(
+            liked = st.favorites.map { it.candidate },
+            disliked = st.disliked,
+            hiddenSources = st.blocked.map { it.substringBefore(':') },
+            classify = CategoryClassifier::classify,
+        )
+
+    /** Sources take turns (or, with a learned taste, come by how much they are liked). */
     private fun pickCandidate(): Candidate? {
         val st = library.value
         val s = settings.value
         val pool = st.pool.filter { eligible(it, st, s) }
-        if (pool.isEmpty()) return null
-        val order = sources.map { it.id }
-        val start = (order.indexOf(st.lastSourceUsed) + 1).coerceAtLeast(0)
-        for (k in order.indices) {
-            val id = order[(start + k) % order.size]
-            val fromSource = pool.filter { it.sourceId == id }
-            if (fromSource.isNotEmpty()) return fromSource.maxBy { it.date }
-        }
-        return pool.first()
+        return Taste.pick(pool, sources.map { it.id }, st.lastSourceUsed, tasteProfile(st, s), CategoryClassifier::classify)
     }
 
     /** Asks every enabled source that is running low for new pictures, all in parallel. */
@@ -727,7 +785,7 @@ class WallpaperEngine(
         val st = library.value
         val now = clock()
         fun old(f: File) = now - f.lastModified() > 10 * 60_000L
-        val used = (st.queue + st.history + listOfNotNull(st.current)).map { File(it.file).name }.toSet()
+        val used = (st.queue + st.history + listOfNotNull(st.current, st.lockCurrent)).map { File(it.file).name }.toSet()
         imagesDir.listFiles()?.forEach { if (it.name !in used && old(it)) it.delete() }
         val fav = st.favorites.map { File(it.file).name }.toSet()
         favoritesDir.listFiles()?.forEach { if (it.name !in fav && old(it)) it.delete() }
@@ -756,6 +814,7 @@ class WallpaperEngine(
         private const val MINE_SOURCE_SIDE = 2560
         private const val SEEN_LIMIT = 5000
         private const val POOL_LIMIT = 250
+        private const val DISLIKED_LIMIT = 100
         private const val LOG_LIMIT = 80
         private const val FRESH_INTERVAL = 12 * 3_600_000L
         private const val MIN_FETCH_GAP = 10 * 60_000L

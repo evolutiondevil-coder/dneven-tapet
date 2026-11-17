@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,6 +63,7 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
     var selected by remember { mutableStateOf<StoredImage?>(null) }
     var info by remember { mutableStateOf<StoredImage?>(null) }
     val saveToGallery = rememberGallerySave(vm)
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
 
@@ -124,6 +126,9 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
                     onOpenCrop()
                 },
                 SheetAction(Icons.Outlined.Download, "Запази", enabled = !MyPhotos.isMine(image.key)) { saveToGallery(image) },
+                SheetAction(Icons.Outlined.Share, "Сподели") {
+                    if (!Share.share(context, image)) vm.hint("Няма приложение, с което да се сподели")
+                },
                 SheetAction(Icons.Outlined.Info, "Инфо") {
                     info = image
                     selected = null

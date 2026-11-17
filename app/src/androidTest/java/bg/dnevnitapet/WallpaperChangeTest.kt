@@ -185,7 +185,7 @@ class WallpaperChangeTest {
         val engine = graph.engine
         val (w, h) = DeviceInfo.screenSize(context)
         graph.settings.update { it.copy(panorama = true, panoramaScreens = 2f, target = WallpaperTarget.HOME, photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
-        engine.refitForPanorama(wasPanorama = false)
+        engine.refitForPanorama(wasLive = false)
         engine.refill(minQueue = 3)
         val queue = graph.library.value.queue
         assertTrue("nothing prepared for the panorama", queue.isNotEmpty())
@@ -254,15 +254,65 @@ class WallpaperChangeTest {
             seen.maxOrNull()!! - seen.minOrNull()!! > 0.05f,
         )
 
-        // Switching the panorama off puts a plain wallpaper back.
-        graph.settings.update { it.copy(panorama = false) }
-        engine.refitForPanorama(wasPanorama = true)
+        // Effects: tilt, "По-четливи икони" (darker and blurred) and "Вечер по-тъмно".
+        graph.settings.update { it.copy(tilt = true, readableIcons = bg.dnevnitapet.model.ReadableMode.DIM_BLUR, eveningDim = true) }
+        Thread.sleep(2500)
+        shell("input swipe ${w / 2} ${h / 2} ${w / 2 + 5} ${h / 2} 100")
+        Thread.sleep(1500)
+        shell("screencap -p /sdcard/Download/panorama-5-effects.png")
+        Log.i(TAG, "panorama with effects: $stats")
+        assertTrue("no darkening with readable icons: $stats", stats.dim >= 0.17f)
+        assertTrue("picture not softened: $stats", stats.blurred)
+        assertTrue("tilt sensor not listening: $stats", stats.tiltListening)
+
+        // Switching the panorama and the effects off puts a plain wallpaper back.
+        graph.settings.update {
+            it.copy(panorama = false, tilt = false, readableIcons = bg.dnevnitapet.model.ReadableMode.OFF, eveningDim = false)
+        }
+        engine.refitForPanorama(wasLive = true)
         assertTrue("live wallpaper still on after switching the panorama off", !bg.dnevnitapet.wallpaper.Panorama.isActive(context))
         if (android.os.Build.VERSION.SDK_INT >= 34) {
             assertTrue("lock screen still shows the live wallpaper", wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK) == null)
         }
         // Leave plain wallpapers behind (the app is uninstalled after the tests).
         wm.clear(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
+    }
+
+    @Test
+    fun e_lockScreenGetsADifferentPicture(): Unit = runBlocking {
+        val graph = Graph.get(context)
+        val engine = graph.engine
+        val wm = WallpaperManager.getInstance(context)
+        graph.settings.update {
+            it.copy(target = WallpaperTarget.BOTH, lockDifferent = true, photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE, panorama = false)
+        }
+        engine.refill(minQueue = 3)
+        val r = engine.next(Trigger.MANUAL, allowDownload = false)
+        assertTrue("change failed: $r", r is ChangeResult.Changed)
+        val st = graph.library.value
+        Log.i(TAG, "home ${st.current?.key} / lock ${st.lockCurrent?.key}")
+        assertTrue("no separate lock picture", st.lockCurrent != null)
+        assertNotEquals(st.current?.key, st.lockCurrent?.key)
+        val home = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
+        val lock = wm.getWallpaperId(WallpaperManager.FLAG_LOCK)
+        Log.i(TAG, "wallpaper ids home=$home lock=$lock")
+        assertTrue("lock screen has no own wallpaper", lock > 0 && lock != home)
+        graph.settings.update { it.copy(target = WallpaperTarget.HOME, lockDifferent = false) }
+    }
+
+    @Test
+    fun f_shareSendsThePictureWithItsName(): Unit = runBlocking {
+        val graph = Graph.get(context)
+        val image = graph.library.value.current ?: graph.library.value.history.first()
+        val chooser = bg.dnevnitapet.ui.Share.intent(context, image)
+        @Suppress("DEPRECATION")
+        val send = chooser.getParcelableExtra<android.content.Intent>(android.content.Intent.EXTRA_INTENT)!!
+        @Suppress("DEPRECATION")
+        val uri = send.getParcelableExtra<android.net.Uri>(android.content.Intent.EXTRA_STREAM)!!
+        val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        Log.i(TAG, "share: $uri ${bytes.size} bytes, text='${send.getStringExtra(android.content.Intent.EXTRA_TEXT)}'")
+        assertTrue(bytes.size > 1000)
+        assertTrue(send.getStringExtra(android.content.Intent.EXTRA_TEXT)!!.contains(image.candidate.title))
     }
 
     companion object {

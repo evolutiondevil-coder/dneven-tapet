@@ -27,12 +27,30 @@ object WallpaperSize {
      * Where to draw a [bitmapW] x [bitmapH] picture on a [surfaceW] x [surfaceH] screen at
      * [offset] (0 = the left edge of the picture, 1 = the right edge): it fills the screen,
      * centred vertically. Returns the scale and the left/top position.
+     *
+     * With tilt, the picture is enlarged by [zoom] and [tiltX]/[tiltY] (-1..1) move it inside
+     * that extra margin; the panorama's sliding uses only the rest of the width.
      */
-    fun placement(bitmapW: Int, bitmapH: Int, surfaceW: Int, surfaceH: Int, offset: Float): Placement {
-        val scale = max(surfaceW.toFloat() / bitmapW, surfaceH.toFloat() / bitmapH)
+    fun placement(
+        bitmapW: Int,
+        bitmapH: Int,
+        surfaceW: Int,
+        surfaceH: Int,
+        offset: Float,
+        zoom: Float = 1f,
+        tiltX: Float = 0f,
+        tiltY: Float = 0f,
+    ): Placement {
+        val base = max(surfaceW.toFloat() / bitmapW, surfaceH.toFloat() / bitmapH)
+        val scale = base * zoom
         val extraW = bitmapW * scale - surfaceW
         val extraH = bitmapH * scale - surfaceH
-        return Placement(scale, -extraW * offset.coerceIn(0f, 1f), -extraH / 2f)
+        // Margin kept free for tilting, both sides together.
+        val tiltMarginW = (surfaceW * (zoom - 1f)).coerceIn(0f, extraW.coerceAtLeast(0f))
+        val slideW = extraW - tiltMarginW
+        val left = -(slideW * offset.coerceIn(0f, 1f) + tiltMarginW * (0.5f + 0.5f * tiltX.coerceIn(-1f, 1f)))
+        val top = -(extraH * (0.5f + 0.5f * tiltY.coerceIn(-1f, 1f)))
+        return Placement(scale, left, top)
     }
 
     data class Placement(val scale: Float, val left: Float, val top: Float)

@@ -7,6 +7,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -16,7 +20,16 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import bg.dnevnitapet.Graph
+import bg.dnevnitapet.image.Effects
 import bg.dnevnitapet.image.WallpaperSize
+import bg.dnevnitapet.model.ReadableMode
+import bg.dnevnitapet.model.Settings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import java.util.Calendar
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.math.PI
@@ -33,8 +46,33 @@ import kotlin.math.sin
 class PanoramaWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = PanoramaEngine()
 
-    private inner class PanoramaEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
+    private inner class PanoramaEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener, SensorEventListener {
         private val handler = Handler(Looper.getMainLooper())
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        private var settings = Settings()
+
+        /** Smaller, softened copy of the picture for "Затъмни и размажи". */
+        private var blurred: Bitmap? = null
+        private val dimPaint = Paint()
+
+        // Tilt: the phone's tilt relative to how it is usually held (a slowly following baseline).
+        private val sensors = getSystemService(android.content.Context.SENSOR_SERVICE) as? SensorManager
+        private val gravity: Sensor? = sensors?.getDefaultSensor(Sensor.TYPE_GRAVITY) ?: sensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        private var listening = false
+        private var baseSet = false
+        private var baseX = 0f
+        private var baseY = 0f
+        private var tiltX = 0f
+        private var tiltY = 0f
+
+        /** Evening dimming follows the clock while the home screen is visible. */
+        private val clockTick = object : Runnable {
+            override fun run() {
+                if (!visible || !settings.eveningDim) return
+                draw()
+                handler.postDelayed(this, 5 * 60_000L)
+            }
+        }
         private val loader = Executors.newSingleThreadExecutor()
         private val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
         private val matrix = Matrix()
@@ -86,10 +124,27 @@ class PanoramaWallpaperService : WallpaperService() {
             super.onCreate(surfaceHolder)
             setTouchEventsEnabled(true)
             Panorama.prefs(this@PanoramaWallpaperService).registerOnSharedPreferenceChangeListener(this)
+            val store = runCatching { Graph.get(this@PanoramaWallpaperService).settings }.getOrNull()
+            if (store != null) {
+                settings = store.value
+                scope.launch {
+                    store.state.collect { s ->
+                        val blurChanged = (s.readableIcons == ReadableMode.DIM_BLUR) != (settings.readableIcons == ReadableMode.DIM_BLUR)
+                        settings = s
+                        if (blurChanged) makeBlurred()
+                        updateSensor()
+                        updateClock()
+                        draw()
+                    }
+                }
+            }
         }
 
         override fun onDestroy() {
             Panorama.prefs(this@PanoramaWallpaperService).unregisterOnSharedPreferenceChangeListener(this)
+            scope.cancel()
+            if (listening) sensors?.unregisterListener(this)
+            listening = false
             handler.removeCallbacksAndMessages(null)
             loader.shutdownNow()
             bitmap = null
@@ -112,6 +167,8 @@ class PanoramaWallpaperService : WallpaperService() {
         override fun onVisibilityChanged(visible: Boolean) {
             this.visible = visible
             handler.removeCallbacks(previewPan)
+            updateSensor()
+            updateClock()
             if (visible) {
                 load()
                 draw()
@@ -175,6 +232,84 @@ class PanoramaWallpaperService : WallpaperService() {
             if (key == null || key == Panorama.KEY_FILE) handler.post { load(); draw() }
         }
 
+        // ------------------------------------------------------------ tilt
+
+        private fun updateSensor() {
+            val want = visible && settings.tilt && gravity != null
+            if (want && !listening) {
+                baseSet = false
+                listening = sensors?.registerListener(this, gravity, SensorManager.SENSOR_DELAY_GAME) == true
+                Stats.tiltListening = listening
+            } else if (!want && listening) {
+                sensors?.unregisterListener(this)
+                listening = false
+                tiltX = 0f
+                tiltY = 0f
+            }
+        }
+
+        override fun onSensorChanged(event: SensorEvent) {
+            val gx = event.values[0]
+            val gy = event.values[1]
+            if (!baseSet) {
+                baseX = gx
+                baseY = gy
+                baseSet = true
+            }
+            // The baseline follows slowly, so only movements count, not how the phone is held.
+            baseX += (gx - baseX) * 0.015f
+            baseY += (gy - baseY) * 0.015f
+            val tx = ((gx - baseX) / TILT_RANGE).coerceIn(-1f, 1f)
+            val ty = (-(gy - baseY) / TILT_RANGE).coerceIn(-1f, 1f)
+            val nx = tiltX + (tx - tiltX) * 0.25f
+            val ny = tiltY + (ty - tiltY) * 0.25f
+            if (abs(nx - tiltX) > 0.002f || abs(ny - tiltY) > 0.002f) {
+                tiltX = nx
+                tiltY = ny
+                Stats.tiltEvents++
+                draw()
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+        private fun updateClock() {
+            handler.removeCallbacks(clockTick)
+            if (visible && settings.eveningDim) handler.postDelayed(clockTick, 5 * 60_000L)
+        }
+
+        /** The darkening drawn over the picture now (readable icons and/or evening). */
+        private fun dimNow(): Float {
+            val readable = Effects.readableDim(settings.readableIcons)
+            if (!settings.eveningDim) return readable
+            val now = Calendar.getInstance()
+            val evening = Effects.eveningDim(now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE))
+            return Effects.combine(readable, evening)
+        }
+
+        /** Softened copy: reduced a lot, enlarged again when drawn (cheap and smooth). */
+        private fun makeBlurred() {
+            val src = bitmap
+            if (src == null || settings.readableIcons != ReadableMode.DIM_BLUR) {
+                blurred = null
+                return
+            }
+            loader.execute {
+                val soft = runCatching {
+                    val tiny = Bitmap.createScaledBitmap(src, (src.width / 14).coerceAtLeast(1), (src.height / 14).coerceAtLeast(1), true)
+                    val mid = Bitmap.createScaledBitmap(tiny, (src.width / 4).coerceAtLeast(1), (src.height / 4).coerceAtLeast(1), true)
+                    if (mid !== tiny) tiny.recycle()
+                    mid
+                }.getOrNull()
+                handler.post {
+                    if (bitmap === src) {
+                        blurred = soft
+                        draw()
+                    }
+                }
+            }
+        }
+
         private fun slideTo(target: Float) {
             if (abs(target - offset) < 0.001f) return
             handler.removeCallbacks(animate)
@@ -199,6 +334,8 @@ class PanoramaWallpaperService : WallpaperService() {
                 handler.post {
                     if (decoded != null && loadedPath == path) {
                         bitmap = decoded
+                        blurred = null
+                        makeBlurred()
                         draw()
                     } else if (decoded == null && loadedPath == path) {
                         loadedPath = null
@@ -225,13 +362,24 @@ class PanoramaWallpaperService : WallpaperService() {
                 if (canvas == null) return
                 canvas.drawColor(Color.BLACK)
                 val bmp = bitmap ?: return
-                val p = WallpaperSize.placement(bmp.width, bmp.height, surfaceW, surfaceH, offset)
-                matrix.setScale(p.scale, p.scale)
+                val zoom = if (settings.tilt) Effects.TILT_ZOOM else 1f
+                val p = WallpaperSize.placement(bmp.width, bmp.height, surfaceW, surfaceH, offset, zoom, tiltX, tiltY)
+                val soft = blurred?.takeIf { settings.readableIcons == ReadableMode.DIM_BLUR }
+                val drawn = soft ?: bmp
+                // The softened copy is smaller: scale it up to the picture's size.
+                matrix.setScale(p.scale * bmp.width / drawn.width, p.scale * bmp.height / drawn.height)
                 matrix.postTranslate(p.left, p.top)
-                canvas.drawBitmap(bmp, matrix, paint)
+                canvas.drawBitmap(drawn, matrix, paint)
+                val dim = dimNow()
+                if (dim > 0f) {
+                    dimPaint.color = Color.argb((dim * 255).toInt().coerceIn(0, 255), 0, 0, 0)
+                    canvas.drawRect(0f, 0f, surfaceW.toFloat(), surfaceH.toFloat(), dimPaint)
+                }
                 if (!isPreview) {
                     Stats.draws++
                     Stats.offset = offset
+                    Stats.dim = dim
+                    Stats.blurred = soft != null
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "draw failed", e)
@@ -249,9 +397,14 @@ class PanoramaWallpaperService : WallpaperService() {
         @Volatile var lastLauncherOffset = Float.NaN
         @Volatile var touchEvents = 0
         @Volatile var launcherScrolls = false
+        @Volatile var dim = 0f
+        @Volatile var blurred = false
+        @Volatile var tiltListening = false
+        @Volatile var tiltEvents = 0
 
         override fun toString() =
-            "draws=$draws offset=$offset offsetEvents=$offsetEvents launcherOffset=$lastLauncherOffset touches=$touchEvents launcherScrolls=$launcherScrolls"
+            "draws=$draws offset=$offset offsetEvents=$offsetEvents launcherOffset=$lastLauncherOffset touches=$touchEvents " +
+                "launcherScrolls=$launcherScrolls dim=$dim blurred=$blurred tilt=$tiltListening/$tiltEvents"
     }
 
     companion object {
@@ -261,5 +414,7 @@ class PanoramaWallpaperService : WallpaperService() {
         private const val PREVIEW_PERIOD_MS = 7000L
         /** Without positions from the launcher: a swipe moves by one of this many screens. */
         private const val FALLBACK_SCREENS = 3
+        /** Tilt (m/s² of gravity) that moves the picture to the edge of its margin. */
+        private const val TILT_RANGE = 2.5f
     }
 }

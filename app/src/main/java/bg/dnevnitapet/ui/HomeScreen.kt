@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -390,6 +391,14 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                             },
                                         )
                                     }
+                                    DropdownMenuItem(
+                                        text = { Text("Сподели") },
+                                        leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                                        onClick = {
+                                            menuOpen = false
+                                            if (!Share.share(context, shown)) vm.hint("Няма приложение, с което да се сподели")
+                                        },
+                                    )
                                     DropdownMenuItem(
                                         text = { Text("Не показвай повече") },
                                         leadingIcon = { Icon(Icons.Filled.Block, contentDescription = null) },

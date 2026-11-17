@@ -8,6 +8,7 @@ import bg.dnevnitapet.model.LibraryState
 import bg.dnevnitapet.model.PhotoMode
 import bg.dnevnitapet.model.Settings
 import bg.dnevnitapet.model.StoredImage
+import bg.dnevnitapet.sources.label
 import bg.dnevnitapet.wallpaper.ChangeResult
 import bg.dnevnitapet.wallpaper.MyPhotos
 import bg.dnevnitapet.wallpaper.Trigger
@@ -251,9 +252,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val before = settings.value
             val after = graph.settings.update(transform)
-            if (before.panoramaOn != after.panoramaOn || (after.panoramaOn && before.panoramaScreens != after.panoramaScreens)) {
-                refitPanorama(before.panoramaOn)
-            }
+            applyLiveChange(before, after)
             if (before.wifiOnly != after.wifiOnly || before.enabledSources != after.enabledSources ||
                 before.photoMode != after.photoMode ||
                 before.enabledCategories != after.enabledCategories ||
@@ -264,6 +263,43 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             scheduler.reschedule()
         }
     }
+
+    /**
+     * The panorama or an effect changed: pictures are cut again for a changed panorama; when no
+     * effect is left, the home screen gets a plain wallpaper again.
+     */
+    private suspend fun applyLiveChange(before: Settings, after: Settings) {
+        if (before.panoramaOn != after.panoramaOn || (after.panoramaOn && before.panoramaScreens != after.panoramaScreens)) {
+            refitPanorama(before.liveOn)
+        } else if (before.liveOn && !after.liveOn) {
+            engine.leaveLive()
+        }
+    }
+
+    /**
+     * Switches a home-screen effect (or the panorama) on or off. When the app's live wallpaper is
+     * newly needed, [onReady] opens the system screen where the user confirms it once.
+     */
+    fun setLiveOption(transform: (Settings) -> Settings, onReady: () -> Unit) {
+        viewModelScope.launch {
+            val before = settings.value
+            graph.settings.update(transform)
+            val after = settings.value
+            applyLiveChange(before, after)
+            scheduler.reschedule()
+            when {
+                after.liveOn && !before.liveOn -> onReady()
+                before.liveOn && !after.liveOn -> say("Ефектите са изключени – тапетът е пак обикновен")
+            }
+        }
+    }
+
+    /** What the app has learned from the favourites and the hidden pictures ("" = nothing yet). */
+    fun tasteSummary(): String = bg.dnevnitapet.wallpaper.Taste.describe(
+        engine.tasteProfile(),
+        bg.dnevnitapet.sources.SourceRegistry::name,
+        { it.label },
+    )
 
     /** (Re)cuts the pictures for the panorama setting that has just changed. */
     private suspend fun refitPanorama(wasOn: Boolean) {
@@ -277,23 +313,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         scheduler.enqueueRefill(replace = true)
     }
 
-    /**
-     * Switches the panorama on or off. When switched on, the wider pictures are prepared first and
-     * then [onReady] opens the system screen where the user confirms the live wallpaper once.
-     */
-    fun setPanorama(on: Boolean, onReady: () -> Unit) {
-        viewModelScope.launch {
-            val before = settings.value
-            graph.settings.update { it.copy(panorama = on) }
-            if (before.panoramaOn != settings.value.panoramaOn) refitPanorama(before.panoramaOn)
-            scheduler.reschedule()
-            if (on) {
-                onReady()
-            } else {
-                say("Панорамата е изключена – тапетът е пак с размера на екрана")
-            }
-        }
-    }
+    /** Switches the panorama on or off (wider pictures are prepared first). */
+    fun setPanorama(on: Boolean, onReady: () -> Unit) = setLiveOption({ it.copy(panorama = on) }, onReady)
 
     fun startOnboarding() {
         viewModelScope.launch {
