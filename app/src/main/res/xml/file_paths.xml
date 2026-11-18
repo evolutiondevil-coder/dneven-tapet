@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Only copies made for "Сподели" are visible to other apps. -->
+<!-- Only copies made for "Сподели" and a downloaded update are visible to other apps. -->
 <paths>
     <cache-path name="share" path="share/" />
+    <!-- A downloaded new version, handed to the phone's installer. -->
+    <cache-path name="update" path="update/" />
 </paths>

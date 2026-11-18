@@ -315,6 +315,29 @@ class WallpaperChangeTest {
         assertTrue(send.getStringExtra(android.content.Intent.EXTRA_TEXT)!!.contains(image.candidate.title))
     }
 
+    @Test
+    fun g_updateDownloadsTheLatestReleaseFromGitHub(): Unit = runBlocking {
+        val http = bg.dnevnitapet.net.OkHttpHttp()
+        val text = try {
+            http.getText(bg.dnevnitapet.update.Updater.LATEST_URL, mapOf("Accept" to "application/vnd.github+json"))
+        } catch (e: bg.dnevnitapet.net.HttpStatusException) {
+            // GitHub limits unauthenticated requests per address; shared CI machines can hit it.
+            org.junit.Assume.assumeTrue("GitHub answered ${e.code}", e.code != 403 && e.code != 429)
+            throw e
+        }
+        val release = bg.dnevnitapet.update.ReleaseParser.parse(text)
+        Log.i(TAG, "latest release: $release")
+        assertTrue("no installable release on GitHub", release != null)
+        assertTrue(bg.dnevnitapet.update.Versions.isNewer(release!!.tag, "1.2.0"))
+        // A test build never asks to be replaced.
+        assertTrue(!bg.dnevnitapet.update.Versions.isNewer(release.tag, BuildConfig.VERSION_NAME) || BuildConfig.VERSION_NAME.matches(Regex("\\d+\\.\\d+\\.\\d+")))
+        val updater = bg.dnevnitapet.update.Updater(context, http)
+        val file = updater.download(release)
+        Log.i(TAG, "downloaded ${file.length()} bytes")
+        assertTrue("downloaded file is not this app", updater.isThisApp(file))
+        file.delete()
+    }
+
     companion object {
         const val TAG = "DnevenTapetTest"
     }

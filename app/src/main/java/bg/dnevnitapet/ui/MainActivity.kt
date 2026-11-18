@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 enum class Screen { HOME, HISTORY, FAVORITES, SETTINGS, CROP, MY_PHOTOS }
 
@@ -48,6 +49,20 @@ class MainActivity : ComponentActivity() {
                     })
                     Screen.SETTINGS -> SettingsScreen(vm, onBack = { screen = Screen.HOME }, onOpenMyPhotos = { screen = Screen.MY_PHOTOS })
                     Screen.CROP -> CropScreen(vm, onClose = { screen = cropFrom })
+                }
+                // A newer version on GitHub: asked at every start until it is installed.
+                val release by vm.updateAvailable.collectAsStateWithLifecycle()
+                val dismissed by vm.updatePromptDismissed.collectAsStateWithLifecycle()
+                val updateState by vm.updateState.collectAsStateWithLifecycle()
+                release?.let { r ->
+                    if (!dismissed && screen != Screen.CROP) {
+                        UpdateDialog(
+                            r,
+                            downloading = updateState == MainViewModel.UpdateState.Downloading,
+                            onUpdate = vm::installUpdate,
+                            onLater = vm::dismissUpdatePrompt,
+                        )
+                    }
                 }
             }
         }

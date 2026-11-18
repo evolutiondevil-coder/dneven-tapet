@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Panorama without the live wallpaper: tells the system the wallpaper is wider than the screen. -->
     <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
+    <!-- "Нова версия": hands the downloaded update to the phone's installer (the user confirms). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- The panorama is a live wallpaper; phones without live wallpapers can still install the app. -->
     <uses-feature
         android:name="android.software.live_wallpaper"

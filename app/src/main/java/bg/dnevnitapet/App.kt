@@ -42,6 +42,7 @@ class AppGraph(private val app: Application) {
     val engine = WallpaperEngine(app, library, settings, http, WallpaperSetter(app))
     val scheduler = Scheduler(app, engine)
     val gallery = GallerySaver(app, http)
+    val updater = bg.dnevnitapet.update.Updater(app, http)
 
     init {
         engine.onChanged = { refreshSurfaces(app) }

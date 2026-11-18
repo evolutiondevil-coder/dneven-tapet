@@ -149,6 +149,8 @@ data class Settings(
     val lockDifferent: Boolean = false,
     /** Prefer the sources and kinds of pictures the user likes (♥) and not the hidden ones. */
     val learnTaste: Boolean = true,
+    /** Look on GitHub for a newer version when the app starts. */
+    val checkUpdates: Boolean = true,
     val frequency: FrequencyMode = FrequencyMode.DAILY,
     /** Minutes after midnight for the daily change. */
     val dailyMinuteOfDay: Int = 5 * 60,

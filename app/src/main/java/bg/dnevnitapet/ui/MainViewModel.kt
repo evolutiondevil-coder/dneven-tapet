@@ -59,8 +59,81 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun canScheduleExact(): Boolean = scheduler.canScheduleExact()
     fun cacheBytes(): Long = engine.cacheBytes()
 
+    // ---------------------------------------------------------------- new version
+
+    sealed class UpdateState {
+        data object Idle : UpdateState()
+        data object Downloading : UpdateState()
+    }
+
+    /** A newer version on GitHub (null = up to date or not checked yet). */
+    val updateAvailable: StateFlow<bg.dnevnitapet.update.ReleaseInfo?> = graph.updater.available
+
+    private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
+
+    /** "По-късно" hides the question until the app is started again. */
+    private val _updatePromptDismissed = MutableStateFlow(false)
+    val updatePromptDismissed: StateFlow<Boolean> = _updatePromptDismissed.asStateFlow()
+
+    /** Waiting for the user to allow installing updates in the system settings. */
+    private var installAfterPermission = false
+
+    init {
+        if (settings.value.checkUpdates) checkForUpdate(manual = false)
+    }
+
+    /** Looks on GitHub for a newer version; [manual] = "Провери сега" (always asks, reports the result). */
+    fun checkForUpdate(manual: Boolean) {
+        viewModelScope.launch {
+            val r = runCatching { graph.updater.check(minGapMs = if (manual) 0L else 30 * 60_000L) }
+            if (!manual) return@launch
+            val newer = r.getOrNull()
+            say(
+                when {
+                    r.isFailure -> "Не успях да проверя за нова версия – няма връзка с GitHub"
+                    newer != null -> "Има нова версия ${newer.version}"
+                    else -> "Имаш най-новата версия (${bg.dnevnitapet.BuildConfig.VERSION_NAME})"
+                },
+            )
+            if (newer != null) _updatePromptDismissed.value = false
+        }
+    }
+
+    fun dismissUpdatePrompt() {
+        _updatePromptDismissed.value = true
+    }
+
+    /** "Обнови": downloads the new version and opens the phone's installer. */
+    fun installUpdate() {
+        val release = updateAvailable.value ?: return
+        if (_updateState.value == UpdateState.Downloading) return
+        val updater = graph.updater
+        if (!updater.canInstall()) {
+            installAfterPermission = true
+            say("Разреши „Инсталиране от този източник“ и се върни – обновлението ще продължи само")
+            if (!updater.openInstallPermission()) say("Отвори Настройки → Приложения → Дневен тапет и разреши инсталиране на приложения")
+            return
+        }
+        viewModelScope.launch {
+            _updateState.value = UpdateState.Downloading
+            try {
+                val file = updater.download(release)
+                updater.install(file)
+            } catch (e: Exception) {
+                say("Обновлението не се изтегли: ${e.message ?: "грешка"}. Опитай пак.")
+            } finally {
+                _updateState.value = UpdateState.Idle
+            }
+        }
+    }
+
     /** Called when the app comes to the foreground: catch up on a missed change, refill the queue. */
     fun onResume() {
+        if (installAfterPermission && graph.updater.canInstall()) {
+            installAfterPermission = false
+            installUpdate()
+        }
         // Back after a while: start again from the current wallpaper.
         if (pausedAt > 0 && System.currentTimeMillis() - pausedAt > 2 * 60_000L) {
             _previewKey.value = null
