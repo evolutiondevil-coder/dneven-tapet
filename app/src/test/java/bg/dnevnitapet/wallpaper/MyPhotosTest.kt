@@ -74,4 +74,14 @@ class MyPhotosTest {
         assertEquals(online, MyPhotos.upcomingMixed(PhotoMode.ONLINE, online, mine, currentIsMine = false))
         assertEquals(mine, MyPhotos.upcomingMixed(PhotoMode.MINE, online, mine, currentIsMine = false))
     }
+
+    @Test
+    fun galleryShowsEveryPictureOnce() {
+        // Own photo m1 was shown before (history) and comes again (upcoming): it must not appear twice,
+        // the main screen's gallery crashes on a repeated picture.
+        val order = MyPhotos.browseOrder(listOf("o2", "m1", "o1"), "m2", listOf("m1", "o3")) { it }
+        assertEquals(listOf("o1", "o2", "m2", "m1", "o3"), order)
+        assertEquals(order.size, order.distinct().size)
+        assertEquals(listOf("b", "a"), MyPhotos.browseOrder(listOf("b", "a", "b"), null, emptyList<String>()) { it })
+    }
 }

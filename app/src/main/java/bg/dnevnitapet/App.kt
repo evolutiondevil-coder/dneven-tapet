@@ -26,10 +26,33 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        recordCrashes()
         graph = AppGraph(this)
         graph.appScope.launch {
+            // A crash last time: its reason goes to the log (Настройки → За приложението → Дневник).
+            val crash = File(filesDir, CRASH_FILE)
+            if (crash.exists()) {
+                runCatching { graph.engine.log("Приложението беше спряло: " + crash.readText().take(600)) }
+                crash.delete()
+            }
             graph.scheduler.reschedule()
         }
+    }
+
+    /** Keeps the reason of a crash, so it can be seen and fixed later. */
+    private fun recordCrashes() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+            runCatching {
+                val where = e.stackTrace.take(6).joinToString(" < ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+                File(filesDir, CRASH_FILE).writeText("${BuildConfig.VERSION_NAME} ${e.javaClass.simpleName}: ${e.message} @ $where")
+            }
+            previous?.uncaughtException(thread, e)
+        }
+    }
+
+    companion object {
+        private const val CRASH_FILE = "last-crash.txt"
     }
 }
 

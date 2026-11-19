@@ -152,7 +152,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun browseList(st: LibraryState = library.value, s: Settings = settings.value): List<StoredImage> {
         val upcoming = MyPhotos.upcomingMixed(s.photoMode, st.queue, engine.upcomingMine(st), MyPhotos.isMine(st.current?.key))
-        return st.history.asReversed() + listOfNotNull(st.current) + upcoming
+        return MyPhotos.browseOrder(st.history, st.current, upcoming) { it.key }
     }
 
     /** The picture the user swiped to (the current wallpaper counts as "no preview"). */

@@ -338,6 +338,23 @@ class WallpaperChangeTest {
         file.delete()
     }
 
+    @Test
+    fun h_appOpensWhenAnOwnPhotoIsInHistoryAndComesAgain(): Unit = runBlocking {
+        val graph = Graph.get(context)
+        val engine = graph.engine
+        graph.settings.update { it.copy(onboarded = true, photoMode = bg.dnevnitapet.model.PhotoMode.MINE, target = WallpaperTarget.HOME) }
+        engine.importMine(listOf(fakePhoto("h1.jpg", 2000, 1500, Color.RED), fakePhoto("h2.jpg", 2000, 1500, Color.CYAN)))
+        // Own photos take turns: the first one is now in the history and also among the upcoming ones.
+        repeat(3) { engine.next(Trigger.MANUAL, allowDownload = false) }
+        val st = graph.library.value
+        Log.i(TAG, "history ${st.history.map { it.key }} current ${st.current?.key} upcoming ${engine.upcomingMine(st).map { it.key }}")
+        androidx.test.core.app.ActivityScenario.launch(bg.dnevnitapet.ui.MainActivity::class.java).use { scenario ->
+            Thread.sleep(4000)
+            assertEquals(androidx.lifecycle.Lifecycle.State.RESUMED, scenario.state)
+        }
+        graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
+    }
+
     companion object {
         const val TAG = "DnevenTapetTest"
     }

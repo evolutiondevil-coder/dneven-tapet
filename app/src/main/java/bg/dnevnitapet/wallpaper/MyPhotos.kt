@@ -51,6 +51,17 @@ object MyPhotos {
     }
 
     /**
+     * The main screen's gallery: history (oldest first), the current wallpaper, then what comes next.
+     * Every picture appears once – an own photo that was shown before and comes again is shown only
+     * among the upcoming ones (the gallery cannot hold the same picture twice).
+     */
+    fun <T> browseOrder(historyNewestFirst: List<T>, current: T?, upcoming: List<T>, key: (T) -> String): List<T> {
+        val later = (upcoming.map(key) + listOfNotNull(current).map(key)).toSet()
+        val past = historyNewestFirst.asReversed().filter { key(it) !in later }
+        return (past + listOfNotNull(current) + upcoming).distinctBy(key)
+    }
+
+    /**
      * The upcoming pictures as the main screen shows them, in the order the changes will use them.
      * Mixed mode interleaves the two lists, starting with the kind that comes next.
      */
