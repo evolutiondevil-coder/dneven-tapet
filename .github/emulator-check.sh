@@ -9,7 +9,10 @@ OUT=emulator-out
 mkdir -p "$OUT"
 adb logcat -c || true
 
-shot() { sleep "${2:-3}"; adb exec-out screencap -p > "$OUT/$1.png"; }
+# No adb command may hang the job: each gets at most 90 seconds (a hang shows up as a failed step).
+adb() { timeout 90 command adb "$@"; }
+
+shot() { sleep "${2:-3}"; echo "== $1"; adb exec-out screencap -p > "$OUT/$1.png"; }
 
 # Taps the centre of the first UI element whose text or content-desc equals $1.
 tap() {
