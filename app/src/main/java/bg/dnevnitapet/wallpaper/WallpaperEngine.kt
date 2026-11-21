@@ -195,7 +195,16 @@ class WallpaperEngine(
         var prepared: StoredImage? = null
         for (attempt in attempts) {
             prepared = try {
-                withContext(Dispatchers.IO) { prepare(attempt, relaxed = relaxed) }
+                withContext(Dispatchers.IO) {
+                    try {
+                        prepare(attempt, relaxed = relaxed)
+                    } catch (e: bg.dnevnitapet.net.HttpStatusException) {
+                        // "Too many requests": a moment later it usually works.
+                        if (e.code != 429) throw e
+                        kotlinx.coroutines.delay(2_000)
+                        prepare(attempt, relaxed = relaxed)
+                    }
+                }
             } catch (e: Exception) {
                 bg.dnevnitapet.util.Diag.i("download ${attempt.variants.firstOrNull()?.url} failed: ${describe(e)}")
                 log(tr("Снимка от архива не се изтегли: {0}", describe(e)))
