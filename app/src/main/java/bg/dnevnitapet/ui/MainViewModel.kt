@@ -48,6 +48,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------------------------------------------------------- rules by weather
+
+    /** "Сега в София: дъжд" for the settings (null = the city or the weather was not found). */
+    fun checkWeather(city: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val sky = runCatching { graph.weather.sky(city) }.getOrNull()
+            onResult(sky?.label)
+        }
+    }
+
+    // ---------------------------------------------------------------- albums
+
+    fun setAlbumsOn(on: Boolean) = updateSettings { it.copy(albumsOn = on) }
+
+    /** A new, empty album; [onCreated] gets its id (to open it and choose the photos). */
+    fun createAlbum(name: String, onCreated: (String) -> Unit) {
+        val id = java.util.UUID.randomUUID().toString().take(8)
+        viewModelScope.launch {
+            graph.library.update { it.copy(albums = it.albums + bg.dnevnitapet.model.Album(id, name.trim().ifBlank { "Албум" })) }
+            onCreated(id)
+        }
+    }
+
+    fun renameAlbum(id: String, name: String) {
+        viewModelScope.launch {
+            graph.library.update { st -> st.copy(albums = st.albums.map { if (it.id == id) it.copy(name = name.trim().ifBlank { it.name }) else it }) }
+        }
+    }
+
+    fun deleteAlbum(id: String) {
+        viewModelScope.launch {
+            graph.library.update { st -> st.copy(albums = st.albums.filter { it.id != id }) }
+            updateSettings { s ->
+                s.copy(homeAlbum = s.homeAlbum.takeIf { it != id }.orEmpty(), lockAlbum = s.lockAlbum.takeIf { it != id }.orEmpty())
+            }
+        }
+    }
+
+    /** Puts a photo into the album, or takes it out. */
+    fun toggleInAlbum(id: String, key: String) {
+        viewModelScope.launch {
+            graph.library.update { st ->
+                st.copy(albums = st.albums.map { a -> if (a.id != id) a else a.copy(keys = if (key in a.keys) a.keys - key else a.keys + key) })
+            }
+        }
+    }
+
+    /** The album the home screen ("" = all own photos) or the lock screen takes its photos from. */
+    fun setScreenAlbum(lock: Boolean, id: String) = updateSettings { if (lock) it.copy(lockAlbum = id) else it.copy(homeAlbum = id) }
+
     // ---------------------------------------------------------------- art break
 
     /** A painting shown as "Пауза за изкуство", with its title and story in Bulgarian when possible. */

@@ -73,9 +73,15 @@ class AppGraph(private val app: Application) {
     val places = bg.dnevnitapet.story.Places(app, http)
     val archive = bg.dnevnitapet.archive.Archive(app, http)
     val art = bg.dnevnitapet.art.ArtCollection(app, http)
+    val weather = bg.dnevnitapet.wallpaper.WeatherService(http, places)
 
     init {
         engine.onChanged = { refreshSurfaces(app) }
+        engine.rules = {
+            val s = settings.value
+            val sky = if (s.weatherRules) weather.sky(s.weatherCity) else null
+            bg.dnevnitapet.wallpaper.PictureRules.context(s, java.time.LocalDateTime.now(), sky)
+        }
         // Every picture prepared or shown goes into the archive (with a small preview and its colour).
         appScope.launch {
             library.state

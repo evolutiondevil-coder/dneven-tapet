@@ -85,6 +85,9 @@ class WallpaperEngine(
     /** Called after every wallpaper change (widget and tile refresh themselves). */
     var onChanged: (() -> Unit)? = null
 
+    /** "Според часа, сезона и времето": what suits now (set by the app; null result = no rule on). */
+    var rules: (suspend () -> PictureRules.Context?)? = null
+
     // ---------------------------------------------------------------- changing the wallpaper
 
     suspend fun next(trigger: Trigger, allowDownload: Boolean = true): ChangeResult = changeMutex.withLock {
@@ -101,7 +104,8 @@ class WallpaperEngine(
                     return@withContext ChangeResult.NoImage
                 }
             }
-            var item = takeFromQueue(preferFresh = trigger == Trigger.SCHEDULED)
+            val ctx = runCatching { rules?.invoke() }.getOrNull()
+            var item = takeFromQueue(preferFresh = trigger == Trigger.SCHEDULED, ctx = ctx)
             if (item == null && allowDownload && DeviceInfo.isNetworkAllowed(context, settings.value)) {
                 runCatching { withTimeout(60_000) { refill(minQueue = 1) } }
                 item = takeFromQueue(preferFresh = false)
@@ -137,11 +141,13 @@ class WallpaperEngine(
         val s = settings.value
         if (!s.lockSeparate) return
         val st = library.value
-        val album = usableMine(st)
+        val album = usableMine(st, forLock = true)
         val mineNext = { MyPhotos.nextKey(album.map { it.key }, st.myRotation, st.current?.key) }
         var rotationAfter: List<String>? = null
-        val item: StoredImage? = when (s.photoMode) {
-            PhotoMode.MINE -> mineNext()?.let { (key, rest) -> rotationAfter = rest; album.first { it.key == key } }
+        val item: StoredImage? = when {
+            // The lock screen's own album: another photo of it each time (the home screen keeps its order).
+            s.lockAlbumOn -> album.filter { it.key != st.lockCurrent?.key && it.key != st.current?.key }.randomOrNull() ?: album.firstOrNull()
+            s.photoMode == PhotoMode.MINE -> mineNext()?.let { (key, rest) -> rotationAfter = rest; album.first { it.key == key } }
             else -> takeFromQueue(preferFresh = false)
                 ?: if (s.photoMode == PhotoMode.MIXED) mineNext()?.let { (key, rest) -> rotationAfter = rest; album.first { it.key == key } } else null
         }
@@ -234,7 +240,12 @@ class WallpaperEngine(
 
     // ---------------------------------------------------------------- own photos
 
-    private fun usableMine(st: LibraryState) = st.myPhotos.filter { it.key !in st.blocked && File(it.file).exists() }
+    /** Own photos that can be used, for the home screen or ([forLock]) the lock screen's album. */
+    private fun usableMine(st: LibraryState, forLock: Boolean = false): List<StoredImage> {
+        val s = settings.value
+        val ok = st.myPhotos.filter { it.key !in st.blocked && File(it.file).exists() }
+        return MyPhotos.inAlbum(ok, { it.key }, st.albums, s.albumsOn, if (forLock) s.lockAlbum else s.homeAlbum)
+    }
 
     /** Own photos in the order they will come. */
     fun upcomingMine(st: LibraryState = library.value): List<StoredImage> {
@@ -329,7 +340,13 @@ class WallpaperEngine(
     /** Removes an own photo from the app (the original in the gallery stays). */
     suspend fun removeMine(key: String) {
         val item = library.value.myPhotos.firstOrNull { it.key == key } ?: return
-        library.update { st -> st.copy(myPhotos = st.myPhotos.filter { it.key != key }, myRotation = st.myRotation - key) }
+        library.update { st ->
+            st.copy(
+                myPhotos = st.myPhotos.filter { it.key != key },
+                myRotation = st.myRotation - key,
+                albums = st.albums.map { a -> a.copy(keys = a.keys - key) },
+            )
+        }
         withContext(Dispatchers.IO) {
             File(item.file).delete()
             if (item.sourceUrl.startsWith("file:")) File(item.sourceUrl.removePrefix("file:")).delete()
@@ -370,13 +387,17 @@ class WallpaperEngine(
         }
     }
 
-    private suspend fun takeFromQueue(preferFresh: Boolean): StoredImage? {
+    private suspend fun takeFromQueue(preferFresh: Boolean, ctx: PictureRules.Context? = null): StoredImage? {
         var taken: StoredImage? = null
         val today = LocalDate.now()
         val recent = setOf(today.toString(), today.minusDays(1).toString())
         library.update { st ->
             val valid = st.queue.filter { File(it.file).exists() && it.key !in st.blocked }
-            val pick = (if (preferFresh) valid.firstOrNull { it.candidate.date in recent } else null) ?: valid.firstOrNull()
+            // A picture that suits the time, season or weather comes first (when such a rule is on).
+            val suiting = ctx?.let { PictureRules.best(valid, { it.candidate }, CategoryClassifier::classify, it) }
+            val pick = suiting
+                ?: (if (preferFresh) valid.firstOrNull { it.candidate.date in recent } else null)
+                ?: valid.firstOrNull()
             taken = pick
             st.copy(queue = valid.filter { it !== pick })
         }
@@ -793,7 +814,13 @@ class WallpaperEngine(
     private fun pickCandidate(): Candidate? {
         val st = library.value
         val s = settings.value
-        val pool = st.pool.filter { eligible(it, st, s) }
+        var pool = st.pool.filter { eligible(it, st, s) }
+        // Rules by time and season: when nothing prepared suits the next change, a suiting one is prepared.
+        val ctx = PictureRules.context(s, PictureRules.nextChange(s, java.time.LocalDateTime.now()), sky = null)
+        if (ctx != null) {
+            val suits = { c: Candidate -> PictureRules.score(c, CategoryClassifier.classify(c), ctx) > 0 }
+            if (st.queue.none { suits(it.candidate) }) pool = pool.filter(suits).ifEmpty { pool }
+        }
         return Taste.pick(pool, sources.map { it.id }, st.lastSourceUsed, tasteProfile(st, s), CategoryClassifier::classify)
     }
 

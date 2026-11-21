@@ -14,6 +14,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material.icons.outlined.Thermostat
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -72,6 +75,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -114,7 +119,7 @@ import bg.dnevnitapet.util.Power
 import bg.dnevnitapet.wallpaper.Panorama
 
 /** The bottom sheets that hold the details behind a row with ›. */
-private enum class Sheet { PHOTOS, FREQUENCY, TARGET, SOURCES, CATEGORIES, NETWORK, RELIABILITY, MEMORY, ABOUT }
+private enum class Sheet { PHOTOS, FREQUENCY, TARGET, RULES, SOURCES, CATEGORIES, NETWORK, RELIABILITY, MEMORY, ABOUT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -255,6 +260,14 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                 Group("Смяна") {
                     LinkRow(Icons.Outlined.Schedule, Tint.ORANGE, "Колко често", frequencyLabel(s), first = true) { sheet = Sheet.FREQUENCY }
                     LinkRow(Icons.Outlined.Smartphone, Tint.ORANGE, "Къде да се слага", targetLabel(s)) { sheet = Sheet.TARGET }
+                    LinkRow(
+                        Icons.Outlined.WbSunny, Tint.ORANGE, "Според часа, сезона и времето",
+                        listOfNotNull(
+                            "според часа".takeIf { s.timeRules },
+                            "сезона".takeIf { s.seasonRules },
+                            "времето".takeIf { s.weatherRules },
+                        ).joinToString(", ").replaceFirstChar { it.uppercase() }.ifBlank { "Изключено · по избор" },
+                    ) { sheet = Sheet.RULES }
                     ToggleRow(
                         Icons.Outlined.LockOpen, Tint.ORANGE, "Нова снимка при всяко отключване",
                         "Друга снимка всеки път, когато събудиш телефона", s.changeOnUnlock,
@@ -378,6 +391,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                 Sheet.PHOTOS -> "Какви снимки"
                 Sheet.FREQUENCY -> "Колко често"
                 Sheet.TARGET -> "Къде да се слага"
+                Sheet.RULES -> "Според часа, сезона и времето"
                 Sheet.SOURCES -> "Източници на снимки"
                 Sheet.CATEGORIES -> "Категории"
                 Sheet.NETWORK -> "Изтегляне"
@@ -532,6 +546,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         TextButton(onClick = { showLog = true }) { Text("Дневник на събитията") }
                     }
                 }
+                Sheet.RULES -> RulesSheetContent(vm, s, update)
                 Sheet.MEMORY -> {
                     Column(Modifier.padding(horizontal = 16.dp)) {
                         Text(
@@ -924,5 +939,108 @@ private fun OptionalNote(text: String, modifier: Modifier = Modifier) {
             color = if (isSystemInDarkTheme()) Color(0xFFFFB74D) else Color(0xFF8A4B00),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
+    }
+}
+
+/** "Според часа, сезона и времето": all three optional; the usual picture comes when nothing suits. */
+@Composable
+private fun RulesSheetContent(vm: MainViewModel, s: Settings, update: ((Settings) -> Settings) -> Unit) {
+    Hint(
+        "Подходяща снимка идва първа при всяка смяна. Ако няма подходяща, идва обикновената. Любимите и скритите се спазват както досега.",
+    )
+    Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxWidth()) {
+            ToggleRow(
+                Icons.Outlined.Schedule, Tint.BLUE, "Снимки според часа", "Сутрин едни, вечер други",
+                s.timeRules, first = true, note = "По избор",
+            ) { v -> update { it.copy(timeRules = v) } }
+            if (s.timeRules) {
+                bg.dnevnitapet.wallpaper.PictureRules.DayPart.entries.forEach { part ->
+                    DayPartRow(part, bg.dnevnitapet.wallpaper.PictureRules.categoryFor(s, part)) { c ->
+                        update {
+                            when (part) {
+                                bg.dnevnitapet.wallpaper.PictureRules.DayPart.MORNING -> it.copy(morningCategory = c)
+                                bg.dnevnitapet.wallpaper.PictureRules.DayPart.DAY -> it.copy(dayCategory = c)
+                                bg.dnevnitapet.wallpaper.PictureRules.DayPart.EVENING -> it.copy(eveningCategory = c)
+                                bg.dnevnitapet.wallpaper.PictureRules.DayPart.NIGHT -> it.copy(nightCategory = c)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxWidth()) {
+            ToggleRow(
+                Icons.Outlined.CalendarMonth, Tint.BLUE, "Според сезона", "Зиме повече сняг и планини, лете море и плажове",
+                s.seasonRules, first = true, note = "По избор",
+            ) { v -> update { it.copy(seasonRules = v) } }
+            ToggleRow(
+                Icons.Outlined.Thermostat, Tint.BLUE, "Според времето навън", "Дъжд – уютни снимки, слънце – ярки, сняг – зимни",
+                s.weatherRules, note = "По избор · ползва интернет и твоя град",
+            ) { v -> update { it.copy(weatherRules = v) } }
+            if (s.weatherRules) {
+                var city by remember { mutableStateOf(s.weatherCity) }
+                var now by remember { mutableStateOf<String?>(null) }
+                LaunchedEffect(s.weatherCity) {
+                    if (s.weatherCity.isNotBlank()) vm.checkWeather(s.weatherCity) { now = it ?: "не намирам града" }
+                }
+                Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
+                    OutlinedTextField(
+                        value = city,
+                        onValueChange = { city = it.take(40) },
+                        label = { Text("Твоят град") },
+                        placeholder = { Text("напр. София") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            when {
+                                s.weatherCity.isBlank() -> "Напиши града си и натисни „Запази“."
+                                now == null -> "Проверявам времето…"
+                                else -> "Сега в ${s.weatherCity}: $now"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = {
+                            now = null
+                            update { it.copy(weatherCity = city.trim()) }
+                        }, enabled = city.trim() != s.weatherCity) { Text("Запази") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayPartRow(part: bg.dnevnitapet.wallpaper.PictureRules.DayPart, category: Category?, onSelect: (Category?) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    RowDivider()
+    Row(Modifier.fillMaxWidth().padding(start = 68.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(part.label, style = MaterialTheme.typography.bodyLarge)
+            Text(part.hours, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Box {
+            ChoiceChip(selected = category != null, onClick = { menu = true }, label = { Text((category?.label ?: "Без значение") + " ▾", maxLines = 1, softWrap = false) })
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Без значение") }, onClick = {
+                    menu = false
+                    onSelect(null)
+                })
+                Category.entries.forEach { c ->
+                    DropdownMenuItem(text = { Text(c.label) }, onClick = {
+                        menu = false
+                        onSelect(c)
+                    })
+                }
+            }
+        }
     }
 }

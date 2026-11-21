@@ -141,6 +141,11 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
                     }
                 }
             }
+            if (st.myPhotos.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    AlbumsSection(vm, st, settings)
+                }
+            }
             items(st.myPhotos, key = { it.key }) { photo ->
                 val blocked = photo.key in st.blocked
                 Box(Modifier.clickable { selected = photo }) {

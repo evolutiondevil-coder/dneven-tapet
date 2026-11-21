@@ -80,6 +80,10 @@ data class SourceStatus(
 @Serializable
 data class LogEntry(val at: Long, val message: String)
 
+/** "Албуми": a named group of the user's own photos (a photo can be in several). */
+@Serializable
+data class Album(val id: String, val name: String, val keys: List<String> = emptyList())
+
 @Serializable
 data class LibraryState(
     /** Fetched candidates not yet downloaded. */
@@ -107,6 +111,8 @@ data class LibraryState(
     val lockCurrent: StoredImage? = null,
     /** Hidden pictures whose details are known, for learning the taste. Newest last. */
     val disliked: List<Candidate> = emptyList(),
+    /** The user's albums of own photos ("Албуми", optional). */
+    val albums: List<Album> = emptyList(),
 ) {
     fun isFavorite(key: String) = favorites.any { it.key == key }
 }
@@ -147,6 +153,23 @@ data class Settings(
     val readableIcons: ReadableMode = ReadableMode.OFF,
     /** In the evening and at night the home-screen picture is dimmed a little. */
     val eveningDim: Boolean = false,
+    /** "Снимки според часа" (optional): each part of the day prefers its category. */
+    val timeRules: Boolean = false,
+    val morningCategory: Category? = Category.NATURE,
+    val dayCategory: Category? = Category.CITIES,
+    val eveningCategory: Category? = Category.SEA,
+    val nightCategory: Category? = Category.SPACE,
+    /** "Според сезона" (optional): winter snow, summer sea… */
+    val seasonRules: Boolean = false,
+    /** "Според времето навън" (optional): the weather in [weatherCity] (Open-Meteo) chooses the mood. */
+    val weatherRules: Boolean = false,
+    val weatherCity: String = "",
+    /** "Албуми": own photos in albums; the home and the lock screen can each take their own album. */
+    val albumsOn: Boolean = false,
+    /** Album for the home screen ("" = all own photos). */
+    val homeAlbum: String = "",
+    /** Album for the lock screen ("" = all own photos). */
+    val lockAlbum: String = "",
     /** "Нова снимка при всяко отключване": every time the screen goes off, another picture is put (live wallpaper). */
     val changeOnUnlock: Boolean = false,
     /** A double tap on an empty spot of the home screen brings the next picture (live wallpaper). */
@@ -187,8 +210,11 @@ data class Settings(
         get() = target != WallpaperTarget.LOCK &&
             (panorama || tilt || readableIcons != ReadableMode.OFF || eveningDim || changeOnUnlock || doubleTapNext)
 
+    /** The lock screen's own album applies (own photos in use, albums on, an album chosen). */
+    val lockAlbumOn: Boolean get() = albumsOn && lockAlbum.isNotBlank() && photoMode != PhotoMode.ONLINE
+
     /** The lock screen gets its own picture. */
-    val lockSeparate: Boolean get() = target == WallpaperTarget.BOTH && lockDifferent
+    val lockSeparate: Boolean get() = target == WallpaperTarget.BOTH && (lockDifferent || lockAlbumOn)
 }
 
 @Serializable

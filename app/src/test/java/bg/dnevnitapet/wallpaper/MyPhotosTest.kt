@@ -87,6 +87,18 @@ class MyPhotosTest {
     }
 
     @Test
+    fun `albums choose the photos of a screen`() {
+        val all = listOf("a", "b", "c", "d")
+        val albums = listOf(bg.dnevnitapet.model.Album("trips", "Пътувания", listOf("b", "d")), bg.dnevnitapet.model.Album("empty", "Празен"))
+        assertEquals(listOf("b", "d"), MyPhotos.inAlbum(all, { it }, albums, albumsOn = true, albumId = "trips"))
+        // Albums off, no album chosen, an empty or deleted album: all photos.
+        assertEquals(all, MyPhotos.inAlbum(all, { it }, albums, albumsOn = false, albumId = "trips"))
+        assertEquals(all, MyPhotos.inAlbum(all, { it }, albums, albumsOn = true, albumId = ""))
+        assertEquals(all, MyPhotos.inAlbum(all, { it }, albums, albumsOn = true, albumId = "empty"))
+        assertEquals(all, MyPhotos.inAlbum(all, { it }, albums, albumsOn = true, albumId = "gone"))
+    }
+
+    @Test
     fun galleryShowsEveryPictureOnce() {
         // Own photo m1 was shown before (history) and comes again (upcoming): it must not appear twice,
         // the main screen's gallery crashes on a repeated picture.

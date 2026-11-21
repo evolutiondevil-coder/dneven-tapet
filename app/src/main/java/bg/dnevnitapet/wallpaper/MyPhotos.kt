@@ -16,6 +16,16 @@ object MyPhotos {
     fun isMine(key: String?) = key != null && key.startsWith("$SOURCE_ID:")
 
     /**
+     * The own photos a screen uses: with albums on and an album chosen, only that album's photos
+     * (in album order of [all]); otherwise, or when the album is empty, all of them.
+     */
+    fun <T> inAlbum(all: List<T>, key: (T) -> String, albums: List<bg.dnevnitapet.model.Album>, albumsOn: Boolean, albumId: String): List<T> {
+        if (!albumsOn || albumId.isBlank()) return all
+        val keys = albums.firstOrNull { it.id == albumId }?.keys?.toSet() ?: return all
+        return all.filter { key(it) in keys }.ifEmpty { all }
+    }
+
+    /**
      * The next own photo and the rest of the round after it.
      * @param album keys of all usable own photos (blocked ones already removed), in album order.
      * @param rotation the rest of the current round.
