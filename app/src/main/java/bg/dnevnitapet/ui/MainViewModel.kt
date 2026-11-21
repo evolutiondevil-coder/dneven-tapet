@@ -102,21 +102,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
 
-    /** "По-късно" hides the question until the app is started again. */
+    /** "По-късно" hides the question until the app is opened again. */
     private val _updatePromptDismissed = MutableStateFlow(false)
     val updatePromptDismissed: StateFlow<Boolean> = _updatePromptDismissed.asStateFlow()
 
     /** Waiting for the user to allow installing updates in the system settings. */
     private var installAfterPermission = false
 
-    init {
-        if (settings.value.checkUpdates) checkForUpdate(manual = false)
-    }
-
     /** Looks on GitHub for a newer version; [manual] = "Провери сега" (always asks, reports the result). */
     fun checkForUpdate(manual: Boolean) {
         viewModelScope.launch {
-            val r = runCatching { graph.updater.check(minGapMs = if (manual) 0L else 30 * 60_000L) }
+            val r = runCatching { graph.updater.check(minGapMs = if (manual) 0L else UPDATE_CHECK_GAP_MS) }
             if (!manual) return@launch
             val newer = r.getOrNull()
             say(
@@ -198,10 +194,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Every opening (start, or back after a while): the entrance, unless a bigger greeting is shown. */
     private fun checkEntrance() {
         val now = System.currentTimeMillis()
-        val opened = !resumedBefore || (pausedAt > 0 && now - pausedAt > OPEN_GAP_MS)
-        resumedBefore = true
         val s = settings.value
-        if (!opened || !s.onboarded || !s.openGreeting || _greeting.value != null || _whatsNew.value.isNotEmpty()) return
+        if (!s.onboarded || !s.openGreeting || _greeting.value != null || _whatsNew.value.isNotEmpty()) return
         val phrase = Greeting.openPhrase(java.time.LocalDateTime.now(), lastPhrase)
         lastPhrase = phrase
         _entrance.value = Entrance(now, phrase)
@@ -241,8 +235,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Called when the app comes to the foreground: catch up on a missed change, refill the queue. */
     fun onResume() {
+        // Start, or back in the app after a while: a new opening.
+        val opened = !resumedBefore || (pausedAt > 0 && System.currentTimeMillis() - pausedAt > OPEN_GAP_MS)
+        resumedBefore = true
         checkWelcome()
-        checkEntrance()
+        if (opened) {
+            checkEntrance()
+            // Every opening looks on GitHub for a newer version and asks again ("По-късно" lasts until the next opening).
+            if (settings.value.checkUpdates) {
+                _updatePromptDismissed.value = false
+                checkForUpdate(manual = false)
+            }
+        }
         if (installAfterPermission && graph.updater.canInstall()) {
             installAfterPermission = false
             installUpdate()
@@ -709,5 +713,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         /** Back in the app after at least this long counts as a new opening (the entrance plays). */
         private const val OPEN_GAP_MS = 20_000L
+
+        /** Openings closer together than this reuse the last answer from GitHub (it allows 60 questions an hour). */
+        private const val UPDATE_CHECK_GAP_MS = 2 * 60_000L
     }
 }
