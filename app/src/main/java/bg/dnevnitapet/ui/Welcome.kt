@@ -72,7 +72,7 @@ object Greeting {
         else -> "Добър вечер"
     }
 
-    /** "Петък, 21 ноември". */
+    /** "Петък, 20 ноември". */
     fun date(day: LocalDate): String =
         day.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("bg"))).replaceFirstChar { it.uppercase() }
 }

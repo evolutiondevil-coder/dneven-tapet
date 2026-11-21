@@ -42,6 +42,6 @@ class ReleaseNotesTest {
         assertEquals("Добър ден", Greeting.phrase(13))
         assertEquals("Добър вечер", Greeting.phrase(21))
         assertEquals("Добър вечер", Greeting.phrase(2))
-        assertEquals("Петък, 21 ноември", Greeting.date(LocalDate.of(2026, 11, 21)))
+        assertEquals("Петък, 20 ноември", Greeting.date(LocalDate.of(2026, 11, 20)))
     }
 }
