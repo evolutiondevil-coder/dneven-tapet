@@ -116,6 +116,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bg.dnevnitapet.model.PhotoMode
 import bg.dnevnitapet.model.StoredImage
 import bg.dnevnitapet.sources.SourceRegistry
+import bg.dnevnitapet.story.StoryText
 import bg.dnevnitapet.util.Power
 import bg.dnevnitapet.wallpaper.MyPhotos
 import coil.compose.AsyncImage
@@ -146,6 +147,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val previewKey by vm.previewKey.collectAsStateWithLifecycle()
     val browseOnline by vm.browseOnline.collectAsStateWithLifecycle()
     val entrance by vm.entrance.collectAsStateWithLifecycle()
+    val translations by vm.translations.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -411,7 +413,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                         var menuOpen by remember { mutableStateOf(false) }
                         Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                shown.candidate.title,
+                                StoryText.title(shown.candidate, translations.entries),
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleLarge.copy(shadow = TextShadow),
                                 fontWeight = FontWeight.Bold,
@@ -721,51 +723,6 @@ private fun HoldChip(held: Boolean, onClick: () -> Unit) {
                 softWrap = false,
             )
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun InfoSheet(image: StoredImage, onDismiss: () -> Unit, onSave: () -> Unit) {
-    val c = image.candidate
-    val context = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(c.title, style = MaterialTheme.typography.headlineSmall)
-            if (c.location.isNotBlank() && c.location != c.title) InfoLine("Къде", c.location)
-            if (c.description.isNotBlank() && c.description != c.title) {
-                Text(c.description, style = MaterialTheme.typography.bodyMedium)
-            }
-            if (c.author.isNotBlank()) InfoLine("Автор", c.author)
-            if (c.copyright.isNotBlank() && c.copyright.removePrefix("©").trim() != c.author) InfoLine("Права", c.copyright)
-            InfoLine("Източник", SourceRegistry.name(c.sourceId) + if (c.date.isNotBlank()) " · " + Format.date(c.date) else "")
-            InfoLine("Размер", "${image.width} × ${image.height}")
-            if (c.sourceId != MyPhotos.SOURCE_ID) Text(
-                "Снимката е собственост на автора си. Използва се само като личен тапет.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (c.infoUrl.isNotBlank()) {
-                    FilledTonalButton(onClick = {
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(c.infoUrl))) }
-                    }) { Text("Научи повече") }
-                }
-                TextButton(onClick = onSave) { Text("Запази в галерията") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InfoLine(label: String, value: String) {
-    Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }
 

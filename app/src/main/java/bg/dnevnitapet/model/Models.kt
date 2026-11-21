@@ -41,6 +41,8 @@ data class Candidate(
     val category: Category? = null,
     /** Unsplash requires this endpoint to be called when a photo is used. */
     val downloadPingUrl: String = "",
+    /** Language of the texts ("" = English); Bing's other markets write in their own language. */
+    val lang: String = "",
 )
 
 /** A picture that has been downloaded and cropped to the screen. */
@@ -159,6 +161,8 @@ data class Settings(
     val lastSeenVersion: String = "",
     /** yyyy-MM-dd of the last morning greeting ("Добро утро"), shown once a day. */
     val greetedDay: String = "",
+    /** Titles and stories of the pictures in Bulgarian (automatic translation, language pack once over Wi-Fi). */
+    val translateStories: Boolean = true,
     /** Every opening of the app: the picture settles in and a short phrase appears ("Здравей отново"). */
     val openGreeting: Boolean = true,
     val frequency: FrequencyMode = FrequencyMode.DAILY,

@@ -101,7 +101,7 @@ class NextWidgetProvider : AppWidgetProvider() {
             val current = st.current
             val title = when {
                 busy -> "Сменям…"
-                current != null -> current.candidate.title
+                current != null -> Graph.get(context).stories.title(current.candidate)
                 else -> "Дневен тапет"
             }
             val favorite = current != null && st.isFavorite(current.key)

@@ -66,6 +66,8 @@ class AppGraph(private val app: Application) {
     val scheduler = Scheduler(app, engine)
     val gallery = GallerySaver(app, http)
     val updater = bg.dnevnitapet.update.Updater(app, http)
+    val stories = bg.dnevnitapet.story.StoryTranslator(app, settings)
+    val places = bg.dnevnitapet.story.Places(app, http)
 
     init {
         engine.onChanged = { refreshSurfaces(app) }

@@ -41,7 +41,8 @@ class BingSource : ImageSource {
         for ((market, idx) in calls.distinct()) {
             try {
                 val json = request.http.getText(url(market, idx))
-                BingParser.parse(json).forEach { result.putIfAbsent(it.key, it) }
+                val lang = market.substringBefore('-').takeIf { it != "en" }.orEmpty()
+                BingParser.parse(json).forEach { result.putIfAbsent(it.key, it.copy(lang = lang)) }
             } catch (e: Exception) {
                 lastError = e
             }

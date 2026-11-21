@@ -14,6 +14,9 @@ import bg.dnevnitapet.wallpaper.MyPhotos
 import bg.dnevnitapet.wallpaper.Trigger
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +31,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val library: StateFlow<LibraryState> = graph.library.state
     val settings: StateFlow<Settings> = graph.settings.state
+
+    /** Translations of titles and places made so far (original → Bulgarian). */
+    val translations: StateFlow<bg.dnevnitapet.story.TranslationCache> = graph.stories.cache
+
+    init {
+        // New pictures (prepared, shown, liked): their titles are translated in the background.
+        viewModelScope.launch {
+            graph.library.state
+                .map { st -> (listOfNotNull(st.current) + st.queue + st.history.take(12) + st.favorites).map { it.key } }
+                .distinctUntilChanged()
+                .collectLatest {
+                    kotlinx.coroutines.delay(1500)
+                    translateTitles()
+                }
+        }
+    }
+
+    private fun translateTitles() {
+        val st = library.value
+        val items = listOfNotNull(st.current) + st.queue + st.history.take(12) + st.favorites
+        graph.appScope.launch { runCatching { graph.stories.translateTitles(items.map { it.candidate }) } }
+    }
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -228,7 +253,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             line = when {
                 current == null -> "Днес ще ти сложа нова снимка."
                 MyPhotos.isMine(current.key) -> "Днешният ти тапет е твоя снимка."
-                else -> "Днешният ти тапет е от ${bg.dnevnitapet.sources.SourceRegistry.name(current.candidate.sourceId)}:\n${current.candidate.title}"
+                else -> "Днешният ти тапет е от ${bg.dnevnitapet.sources.SourceRegistry.name(current.candidate.sourceId)}:\n${graph.stories.title(current.candidate)}"
             },
         )
     }
@@ -241,6 +266,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         checkWelcome()
         if (opened) {
             checkEntrance()
+            // Bulgarian titles: the language pack comes once over Wi-Fi, then everything is translated on the phone.
+            if (settings.value.translateStories) {
+                graph.appScope.launch { if (runCatching { graph.stories.prepare() }.getOrDefault(false)) translateTitles() }
+            }
             // Every opening looks on GitHub for a newer version and asks again ("По-късно" lasts until the next opening).
             if (settings.value.checkUpdates) {
                 _updatePromptDismissed.value = false

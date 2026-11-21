@@ -90,6 +90,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // On-device translation of the picture stories into Bulgarian (language pack downloaded once).
+    implementation("com.google.mlkit:translate:17.0.3")
 
     // java.time on Android 7.x
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

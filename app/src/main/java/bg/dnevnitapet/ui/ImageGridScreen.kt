@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bg.dnevnitapet.model.StoredImage
 import bg.dnevnitapet.sources.SourceRegistry
+import bg.dnevnitapet.story.StoryText
 import bg.dnevnitapet.wallpaper.MyPhotos
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -58,6 +59,7 @@ import java.io.File
 @Composable
 fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, onOpenCrop: () -> Unit) {
     val st by vm.library.collectAsStateWithLifecycle()
+    val translations by vm.translations.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var selected by remember { mutableStateOf<StoredImage?>(null) }
@@ -96,7 +98,7 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(items, key = { it.key + it.shownAt }) { image ->
-                    Thumbnail(image, isCurrent = image.key == st.current?.key, isFavorite = st.isFavorite(image.key)) { selected = image }
+                    Thumbnail(image, StoryText.title(image.candidate, translations.entries), isCurrent = image.key == st.current?.key, isFavorite = st.isFavorite(image.key)) { selected = image }
                 }
             }
         }
@@ -106,7 +108,7 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
         val isFavorite = st.isFavorite(image.key)
         PhotoSheet(
             image = image,
-            title = image.candidate.title,
+            title = StoryText.title(image.candidate, translations.entries),
             subtitle = listOf(
                 SourceRegistry.name(image.candidate.sourceId),
                 Format.moment(if (image.shownAt > 0) image.shownAt else image.addedAt),
@@ -147,7 +149,7 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
 }
 
 @Composable
-private fun Thumbnail(image: StoredImage, isCurrent: Boolean, isFavorite: Boolean, onClick: () -> Unit) {
+private fun Thumbnail(image: StoredImage, title: String, isCurrent: Boolean, isFavorite: Boolean, onClick: () -> Unit) {
     Column(Modifier.clickable(onClick = onClick)) {
         Box {
             AsyncImage(
@@ -179,7 +181,7 @@ private fun Thumbnail(image: StoredImage, isCurrent: Boolean, isFavorite: Boolea
             }
         }
         Text(
-            image.candidate.title,
+            title,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
