@@ -53,6 +53,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _loadingMore = MutableStateFlow(false)
     val loadingMore: StateFlow<Boolean> = _loadingMore.asStateFlow()
 
+    /**
+     * With only own photos in use: the main screen shows the internet pictures after the current
+     * one ("От интернет"), so they can be browsed and chosen too.
+     */
+    private val _browseOnline = MutableStateFlow(false)
+    val browseOnline: StateFlow<Boolean> = _browseOnline.asStateFlow()
+
+    /** The gallery shows internet pictures although only own photos are in use. */
+    private fun onlineView(): Boolean = settings.value.photoMode == PhotoMode.MINE && _browseOnline.value
+
+    /** "Моите снимки" / "От интернет" on the main screen. */
+    fun setBrowseOnline(on: Boolean) {
+        if (_browseOnline.value == on) return
+        _browseOnline.value = on
+        if (!on) {
+            showCurrent()
+            return
+        }
+        // Straight to the first internet picture; none prepared yet: download one.
+        val first = library.value.queue.firstOrNull()
+        if (first != null) {
+            _previewKey.value = first.key
+            scrollTo(first.key)
+            setPreview(first.key)
+        } else {
+            say("Изтеглям снимки от интернет…")
+            loadMore()
+        }
+    }
+
     private var pausedAt = 0L
 
     fun nextPlanned(): Long? = scheduler.nextPlanned()
@@ -193,6 +223,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         // Back after a while: start again from the current wallpaper.
         if (pausedAt > 0 && System.currentTimeMillis() - pausedAt > 2 * 60_000L) {
             _previewKey.value = null
+            _browseOnline.value = false
             scrollTo(library.value.current?.key)
         }
         graph.appScope.launch { scheduler.runIfDue(allowDownload = false) }
@@ -206,8 +237,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Oldest history first, then the current wallpaper, then the upcoming pictures in the order the
      * changes will use them (internet pictures, own photos, or both taking turns).
      */
-    fun browseList(st: LibraryState = library.value, s: Settings = settings.value): List<StoredImage> {
-        val upcoming = MyPhotos.upcomingMixed(s.photoMode, st.queue, engine.upcomingMine(st), MyPhotos.isMine(st.current?.key))
+    fun browseList(st: LibraryState = library.value, s: Settings = settings.value, online: Boolean = _browseOnline.value): List<StoredImage> {
+        val upcoming = MyPhotos.upcomingShown(s.photoMode, st.queue, engine.upcomingMine(st), MyPhotos.isMine(st.current?.key), online)
         return MyPhotos.browseOrder(st.history, st.current, upcoming) { it.key }
     }
 
@@ -231,7 +262,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val wanted = (library.value.queue.size + PREFETCH_AHEAD).coerceAtMost(MAX_BROWSE_QUEUE)
-                runCatching { engine.refill(minQueue = wanted, budgetMs = 90_000L, minFetchGapMs = 20_000L) }
+                runCatching { engine.refill(minQueue = wanted, budgetMs = 90_000L, minFetchGapMs = 20_000L, forBrowsing = onlineView()) }
             } finally {
                 prefetching = false
             }
@@ -249,18 +280,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun loadMore() {
         if (_loadingMore.value) return
-        // Only own photos: nothing to download; the last page says so.
-        if (settings.value.photoMode == PhotoMode.MINE) return
+        // Only own photos: nothing to download; the last page says so (unless browsing "От интернет").
+        if (settings.value.photoMode == PhotoMode.MINE && !onlineView()) return
         engine.lastBrowseAt = System.currentTimeMillis()
         viewModelScope.launch {
             _loadingMore.value = true
             try {
                 val before = library.value.queue.map { it.key }.toSet()
                 val wanted = (before.size + 1).coerceAtMost(MAX_BROWSE_QUEUE)
-                runCatching { engine.refill(minQueue = wanted, budgetMs = 60_000L, minFetchGapMs = 20_000L) }
+                runCatching { engine.refill(minQueue = wanted, budgetMs = 60_000L, minFetchGapMs = 20_000L, forBrowsing = onlineView()) }
                 val added = library.value.queue.firstOrNull { it.key !in before }
                 if (added != null) {
                     _previewKey.value = added.key
+                    scrollTo(added.key)
                 } else {
                     say(
                         when {
@@ -503,6 +535,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun myPhotosBytes(): Long = engine.myPhotosBytes()
 
     fun setPhotoMode(mode: PhotoMode) {
+        _browseOnline.value = false
         // With no own photos yet the screen opens the phone's photo picker right away.
         updateSettings { it.copy(photoMode = mode) }
     }

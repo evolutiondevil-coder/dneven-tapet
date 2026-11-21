@@ -591,15 +591,18 @@ class WallpaperEngine(
 
     /**
      * Downloads and prepares pictures until the queue holds [minQueue] of them.
+     * With only own photos in use nothing is downloaded, unless the user browses the internet
+     * pictures on the main screen ([forBrowsing]).
      * @return number of pictures added.
      */
     suspend fun refill(
         minQueue: Int = QUEUE_SIZE,
         budgetMs: Long = 8 * 60_000L,
         minFetchGapMs: Long = MIN_FETCH_GAP,
+        forBrowsing: Boolean = false,
     ): Int = refillMutex.withLock {
         withContext(Dispatchers.IO) {
-            if (settings.value.photoMode == PhotoMode.MINE) return@withContext 0
+            if (settings.value.photoMode == PhotoMode.MINE && !forBrowsing) return@withContext 0
             val started = clock()
             var added = 0
             var attempts = 0

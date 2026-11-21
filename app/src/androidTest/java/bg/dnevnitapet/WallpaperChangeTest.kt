@@ -355,6 +355,30 @@ class WallpaperChangeTest {
         graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
     }
 
+    @Test
+    fun i_internetPicturesCanBeChosenWhileOnlyOwnPhotosAreInUse(): Unit = runBlocking {
+        val graph = Graph.get(context)
+        val engine = graph.engine
+        graph.settings.update { it.copy(onboarded = true, photoMode = bg.dnevnitapet.model.PhotoMode.MINE, target = WallpaperTarget.HOME) }
+        engine.importMine(listOf(fakePhoto("i1.jpg", 2000, 1500, Color.GREEN), fakePhoto("i2.jpg", 2000, 1500, Color.MAGENTA)))
+        engine.next(Trigger.MANUAL, allowDownload = false)
+        graph.library.update { it.copy(queue = emptyList()) }
+        // In the background nothing is downloaded with only own photos …
+        assertEquals(0, engine.refill(minQueue = 1, budgetMs = 60_000L))
+        // … but browsing "От интернет" on the main screen downloads internet pictures.
+        val added = engine.refill(minQueue = 2, budgetMs = 120_000L, minFetchGapMs = 0L, forBrowsing = true)
+        Log.i(TAG, "browsing internet with own photos: $added added")
+        assertTrue("no internet picture prepared", added > 0)
+        val online = graph.library.value.queue.first()
+        val chosen = engine.chooseFromQueue(online.key)
+        assertTrue("choosing an internet picture failed: $chosen", chosen is ChangeResult.Changed)
+        assertEquals(online.key, graph.library.value.current?.key)
+        // The automatic change goes on with the own photos.
+        engine.next(Trigger.SCHEDULED, allowDownload = false)
+        assertTrue("next change is not an own photo", bg.dnevnitapet.wallpaper.MyPhotos.isMine(graph.library.value.current?.key))
+        graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
+    }
+
     companion object {
         const val TAG = "DnevenTapetTest"
     }

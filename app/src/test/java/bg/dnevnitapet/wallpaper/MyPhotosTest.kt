@@ -76,6 +76,17 @@ class MyPhotosTest {
     }
 
     @Test
+    fun `only own photos - the gallery can show the internet pictures`() {
+        val online = listOf("o1", "o2")
+        val mine = listOf("m1", "m2")
+        assertEquals(online, MyPhotos.upcomingShown(PhotoMode.MINE, online, mine, currentIsMine = true, browseOnline = true))
+        assertEquals(mine, MyPhotos.upcomingShown(PhotoMode.MINE, online, mine, currentIsMine = true, browseOnline = false))
+        // The switch only exists with own photos alone; the other modes ignore it.
+        assertEquals(online, MyPhotos.upcomingShown(PhotoMode.ONLINE, online, mine, currentIsMine = false, browseOnline = false))
+        assertEquals(listOf("m1", "o1", "m2", "o2"), MyPhotos.upcomingShown(PhotoMode.MIXED, online, mine, currentIsMine = false, browseOnline = true))
+    }
+
+    @Test
     fun galleryShowsEveryPictureOnce() {
         // Own photo m1 was shown before (history) and comes again (upcoming): it must not appear twice,
         // the main screen's gallery crashes on a repeated picture.

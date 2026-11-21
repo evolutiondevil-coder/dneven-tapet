@@ -97,6 +97,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -134,6 +135,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val pickPhotos = rememberPhotoPicker(vm)
     val loadingMore by vm.loadingMore.collectAsStateWithLifecycle()
     val previewKey by vm.previewKey.collectAsStateWithLifecycle()
+    val browseOnline by vm.browseOnline.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -155,7 +157,10 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     }
 
     val current = st.current
-    val list = remember(st, settings.photoMode) { vm.browseList(st, settings) }
+    // Only own photos in use: "Моите снимки" / "От интернет" switches what comes after the current one.
+    val showSourceSwitch = settings.onboarded && settings.photoMode == PhotoMode.MINE
+    val onlineView = showSourceSwitch && browseOnline
+    val list = remember(st, settings.photoMode, onlineView) { vm.browseList(st, settings, onlineView) }
     val latestList by rememberUpdatedState(list)
     val onboarded by rememberUpdatedState(settings.onboarded)
     val desiredKey = previewKey ?: current?.key
@@ -219,6 +224,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         shown == null -> ""
         isCurrent -> if (shownIsMine) "Сегашният ти тапет · моя снимка" else "Сегашният ти тапет"
         page < historyCount -> "От историята · " + Format.moment(shown.shownAt)
+        onlineView -> "От интернет · $upcomingNumber"
         else -> "Предстояща $upcomingNumber" + if (shownIsMine) " · моя снимка" else ""
     }
 
@@ -244,7 +250,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     loading = loadingMore || busy,
                     onboarded = settings.onboarded,
                     empty = latestList.isEmpty(),
-                    onlyMine = settings.photoMode == PhotoMode.MINE,
+                    onlyMine = settings.photoMode == PhotoMode.MINE && !onlineView,
                     onRetry = vm::loadMore,
                     onAddPhotos = pickPhotos,
                 )
@@ -285,6 +291,13 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     IconButton(onClick = { onNavigate(Screen.SETTINGS) }) {
                         Icon(Icons.Filled.Settings, contentDescription = "Настройки", tint = Color.White)
                     }
+                }
+                if (showSourceSwitch) {
+                    SourceSwitch(
+                        online = onlineView,
+                        onSelect = vm::setBrowseOnline,
+                        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp),
+                    )
                 }
 
                 Column(
@@ -501,7 +514,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             if (g != null) DailyGreeting(g.greeting, g.date, g.line, onDone = vm::closeGreeting)
         }
 
-        SnackbarHost(snackbar, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp))
+        SnackbarHost(snackbar, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = if (showSourceSwitch) 104.dp else 56.dp))
     }
 
     // Once after an update: "Какво ново".
@@ -674,5 +687,38 @@ private fun InfoLine(label: String, value: String) {
     Column {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/**
+ * "Моите снимки" / "От интернет": with only own photos in use, the internet pictures can still be
+ * browsed and chosen on the main screen (the automatic change keeps using the own photos).
+ */
+@Composable
+private fun SourceSwitch(online: Boolean, onSelect: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = 0.38f), modifier = modifier) {
+        Row(Modifier.padding(3.dp)) {
+            SwitchPart("Моите снимки", selected = !online) { onSelect(false) }
+            SwitchPart("От интернет", selected = online) { onSelect(true) }
+        }
+    }
+}
+
+@Composable
+private fun SwitchPart(text: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) Color.White else Color.Transparent,
+        contentColor = if (selected) Color.Black else Color.White,
+        modifier = Modifier.semantics { this.selected = selected },
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     }
 }

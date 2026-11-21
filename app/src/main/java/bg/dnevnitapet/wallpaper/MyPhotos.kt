@@ -62,6 +62,13 @@ object MyPhotos {
     }
 
     /**
+     * The main screen's upcoming pictures. With only own photos in use the user can switch the
+     * gallery to the internet pictures ([browseOnline]): then those are shown after the current one.
+     */
+    fun <T> upcomingShown(mode: PhotoMode, online: List<T>, mine: List<T>, currentIsMine: Boolean, browseOnline: Boolean): List<T> =
+        if (mode == PhotoMode.MINE && browseOnline) online else upcomingMixed(mode, online, mine, currentIsMine)
+
+    /**
      * The upcoming pictures as the main screen shows them, in the order the changes will use them.
      * Mixed mode interleaves the two lists, starting with the kind that comes next.
      */
