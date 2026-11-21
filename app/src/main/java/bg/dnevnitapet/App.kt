@@ -15,6 +15,9 @@ import bg.dnevnitapet.wallpaper.WallpaperEngine
 import bg.dnevnitapet.wallpaper.WallpaperSetter
 import bg.dnevnitapet.widget.NextWidgetProvider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -68,9 +71,21 @@ class AppGraph(private val app: Application) {
     val updater = bg.dnevnitapet.update.Updater(app, http)
     val stories = bg.dnevnitapet.story.StoryTranslator(app, settings)
     val places = bg.dnevnitapet.story.Places(app, http)
+    val archive = bg.dnevnitapet.archive.Archive(app, http)
+    val art = bg.dnevnitapet.art.ArtCollection(app, http)
 
     init {
         engine.onChanged = { refreshSurfaces(app) }
+        // Every picture prepared or shown goes into the archive (with a small preview and its colour).
+        appScope.launch {
+            library.state
+                .map { st -> listOfNotNull(st.current) + st.queue + st.history }
+                .distinctUntilChanged { a, b -> a.map { it.key to it.shownAt } == b.map { it.key to it.shownAt } }
+                .collectLatest { items ->
+                    kotlinx.coroutines.delay(2000)
+                    runCatching { archive.record(items) }
+                }
+        }
     }
 
     fun refreshSurfaces(context: Context) {

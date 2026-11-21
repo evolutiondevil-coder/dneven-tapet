@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
@@ -338,8 +339,14 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                         "Дневен тапет",
                         color = Color.White.copy(alpha = 0.92f),
                         style = MaterialTheme.typography.titleMedium.copy(shadow = TextShadow),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = 16.dp).weight(1f),
                     )
+                    IconButton(onClick = { onNavigate(Screen.ARCHIVE) }) {
+                        Icon(Icons.Filled.Search, contentDescription = "Архив", tint = Color.White)
+                    }
                     IconButton(onClick = { onNavigate(Screen.HISTORY) }) {
                         Icon(Icons.Filled.History, contentDescription = "История", tint = Color.White)
                     }
@@ -582,6 +589,12 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                 modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp).padding(bottom = 80.dp)
                     .graphicsLayer { alpha = phraseAlpha.value },
             )
+        }
+
+        // "Пауза за изкуство" after every 20 pictures browsed.
+        val artShow by vm.art.collectAsStateWithLifecycle()
+        AnimatedVisibility(visible = artShow != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+            artShow?.let { a -> ArtBreak(a, busy, onApply = { vm.applyArt(a) }, onClose = vm::closeArt) }
         }
 
         // First start: four short pages about the app.

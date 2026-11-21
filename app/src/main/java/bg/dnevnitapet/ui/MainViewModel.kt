@@ -48,6 +48,119 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------------------------------------------------------- art break
+
+    /** A painting shown as "Пауза за изкуство", with its title and story in Bulgarian when possible. */
+    data class ArtShow(val art: bg.dnevnitapet.art.Artwork, val title: String, val story: String)
+
+    private val _art = MutableStateFlow<ArtShow?>(null)
+    val art: StateFlow<ArtShow?> = _art.asStateFlow()
+    private var viewedSinceArt = 0
+    private var lastViewedKey: String? = null
+    private var nextArt: ArtShow? = null
+    private var artLoading = false
+
+    /** Counts the pictures browsed; every [ART_EVERY] comes a painting (prepared a few pictures before). */
+    private fun countViewed(key: String) {
+        if (key == lastViewedKey) return
+        lastViewedKey = key
+        if (!settings.value.artBreaks) return
+        viewedSinceArt++
+        if (viewedSinceArt >= ART_EVERY - 4 && nextArt == null) prepareArt()
+        if (viewedSinceArt >= ART_EVERY && nextArt != null && _art.value == null) {
+            _art.value = nextArt
+            nextArt = null
+            viewedSinceArt = 0
+        }
+    }
+
+    private fun prepareArt() {
+        if (artLoading) return
+        artLoading = true
+        viewModelScope.launch {
+            try {
+                val a = runCatching { graph.art.next() }.getOrNull() ?: return@launch
+                val c = a.candidate()
+                val story = runCatching { graph.stories.story(c) }.getOrNull()
+                nextArt = ArtShow(a, story?.title ?: a.title, story?.description ?: a.story)
+            } finally {
+                artLoading = false
+            }
+        }
+    }
+
+    fun closeArt() {
+        _art.value?.let { shown -> graph.appScope.launch { graph.art.markShown(shown.art.id) } }
+        _art.value = null
+    }
+
+    /** "Сложи за тапет" on the painting. */
+    fun applyArt(show: ArtShow) {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val r = engine.applyCandidate(show.art.candidate(), relaxed = true)
+                if (r is ChangeResult.Changed) {
+                    closeArt()
+                    _previewKey.value = null
+                    scrollTo(r.image.key)
+                    say("Картината е твоят тапет")
+                } else {
+                    report(r)
+                }
+                scheduler.reschedule()
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- archive
+
+    /** Every picture prepared or shown, and older ones from NASA's and Wikimedia's archives. */
+    val archive: StateFlow<bg.dnevnitapet.archive.ArchiveState> = graph.archive.state
+
+    private val _archiveLoading = MutableStateFlow(false)
+    val archiveLoading: StateFlow<Boolean> = _archiveLoading.asStateFlow()
+
+    /** "Още от архива": older pictures from NASA and Wikimedia (a few at a time). */
+    fun loadMoreArchive() {
+        if (_archiveLoading.value) return
+        viewModelScope.launch {
+            _archiveLoading.value = true
+            try {
+                val added = runCatching { graph.archive.loadMore(settings.value) }.getOrDefault(0)
+                if (added == 0) say("Не успях да заредя още снимки – провери връзката")
+                else graph.appScope.launch { runCatching { graph.stories.translateTitles(graph.archive.state.value.entries.map { it.candidate }.takeLast(added)) } }
+            } finally {
+                _archiveLoading.value = false
+            }
+        }
+    }
+
+    /** "Сложи за тапет" in the archive (downloads the picture when it is no longer on the phone). */
+    fun applyArchive(entry: bg.dnevnitapet.archive.ArchiveEntry, onDone: () -> Unit) {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val r = engine.applyCandidate(entry.candidate)
+                if (r is ChangeResult.Changed) {
+                    _previewKey.value = null
+                    scrollTo(r.image.key)
+                    say("Тапетът е сменен")
+                    onDone()
+                } else {
+                    report(r)
+                }
+                scheduler.reschedule()
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
     private fun translateTitles() {
         val st = library.value
         val items = listOfNotNull(st.current) + st.queue + st.history.take(12) + st.favorites
@@ -306,6 +419,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setPreview(key: String) {
         bg.dnevnitapet.util.Diag.i("preview -> $key (current=${library.value.current?.key})")
         _previewKey.value = if (key == library.value.current?.key) null else key
+        countViewed(key)
         // Close to the end of the prepared pictures: get the next ones ready in the background,
         // so swiping on stays smooth.
         val queue = library.value.queue
@@ -739,6 +853,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         /** How many pictures ahead are prepared while browsing. */
         private const val PREFETCH_AHEAD = 4
+
+        /** "Пауза за изкуство" after this many pictures browsed. */
+        private const val ART_EVERY = 20
 
         /** Back in the app after at least this long counts as a new opening (the entrance plays). */
         private const val OPEN_GAP_MS = 20_000L

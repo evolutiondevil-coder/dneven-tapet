@@ -12,7 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-enum class Screen { HOME, HISTORY, FAVORITES, SETTINGS, CROP, MY_PHOTOS }
+enum class Screen { HOME, HISTORY, FAVORITES, SETTINGS, CROP, MY_PHOTOS, ARCHIVE }
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
                     })
                     Screen.SETTINGS -> SettingsScreen(vm, onBack = { screen = Screen.HOME }, onOpenMyPhotos = { screen = Screen.MY_PHOTOS })
                     Screen.CROP -> CropScreen(vm, onClose = { screen = cropFrom })
+                    Screen.ARCHIVE -> ArchiveScreen(vm, onBack = { screen = Screen.HOME })
                 }
                 // A newer version on GitHub: asked at every start until it is installed.
                 val release by vm.updateAvailable.collectAsStateWithLifecycle()

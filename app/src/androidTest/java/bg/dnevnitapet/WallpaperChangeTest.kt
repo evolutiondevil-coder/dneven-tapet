@@ -405,6 +405,29 @@ class WallpaperChangeTest {
         graph.settings.update { it.copy(photoMode = bg.dnevnitapet.model.PhotoMode.ONLINE) }
     }
 
+    @Test
+    fun j_archiveAndArtWork(): Unit = runBlocking {
+        val graph = Graph.get(context)
+        // The archive keeps the pictures of the library, with a preview and a colour.
+        val st = graph.library.value
+        graph.archive.record(listOfNotNull(st.current) + st.queue + st.history)
+        val entries = graph.archive.state.value.entries
+        Log.i(TAG, "archive: ${entries.size} pictures, colours ${entries.groupingBy { it.color }.eachCount()}")
+        assertTrue("archive is empty", entries.isNotEmpty())
+        assertTrue("no previews", entries.all { java.io.File(it.thumb).exists() })
+        // Older pictures from NASA and Wikimedia.
+        val added = graph.archive.loadMore(graph.settings.value)
+        Log.i(TAG, "archive: $added older pictures loaded")
+        assertTrue("nothing loaded from the archives", added > 0)
+        // A famous painting for "Пауза за изкуство", and it can become the wallpaper.
+        val art = graph.art.next()
+        Log.i(TAG, "art: $art")
+        assertTrue("no painting", art != null)
+        val r = graph.engine.applyCandidate(art!!.candidate(), relaxed = true)
+        Log.i(TAG, "art as wallpaper: $r")
+        assertTrue("painting not set: $r", r is ChangeResult.Changed)
+    }
+
     companion object {
         const val TAG = "DnevenTapetTest"
     }

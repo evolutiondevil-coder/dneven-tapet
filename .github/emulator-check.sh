@@ -150,6 +150,9 @@ adb shell input keyevent KEYCODE_BACK
 sleep 2
 tap "Моите снимки" && shot 09b-my-photos 3
 adb shell input keyevent KEYCODE_BACK
+sleep 2
+tap "Архив" && shot 09c-archive 4
+adb shell input keyevent KEYCODE_BACK
 adb shell cmd uimode night yes
 shot 10-main-dark 5
 tap "Настройки" && shot 11-settings-dark 3

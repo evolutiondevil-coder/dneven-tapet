@@ -28,6 +28,7 @@ object SourceRegistry {
         "unsplash" -> "Unsplash"
         "pexels" -> "Pexels"
         "mine" -> "Моите снимки"
+        "art" -> "Изкуство"
         else -> id
     }
 }

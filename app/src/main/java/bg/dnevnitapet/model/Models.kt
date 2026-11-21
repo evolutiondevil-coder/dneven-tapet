@@ -163,6 +163,8 @@ data class Settings(
     val greetedDay: String = "",
     /** Titles and stories of the pictures in Bulgarian (automatic translation, language pack once over Wi-Fi). */
     val translateStories: Boolean = true,
+    /** "Пауза за изкуство": after every 20 pictures browsed on the main screen, a famous painting and its story. */
+    val artBreaks: Boolean = true,
     /** Every opening of the app: the picture settles in and a short phrase appears ("Здравей отново"). */
     val openGreeting: Boolean = true,
     val frequency: FrequencyMode = FrequencyMode.DAILY,

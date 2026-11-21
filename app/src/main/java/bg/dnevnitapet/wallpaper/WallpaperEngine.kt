@@ -174,6 +174,37 @@ class WallpaperEngine(
         }
     }
 
+    /**
+     * Sets a picture found in the archive: from the phone when it is still there, otherwise it is
+     * downloaded and cut to the screen first.
+     */
+    suspend fun applyCandidate(c: Candidate, relaxed: Boolean = false): ChangeResult {
+        val st = library.value
+        st.current?.takeIf { it.key == c.key }?.let { return ChangeResult.Changed(it) }
+        if (st.queue.any { it.key == c.key }) return chooseFromQueue(c.key)
+        (st.history + st.favorites).firstOrNull { it.key == c.key && File(it.file).exists() }?.let { return applyStored(it) }
+        val prepared = try {
+            withContext(Dispatchers.IO) { prepare(c, relaxed = relaxed) }
+        } catch (e: Exception) {
+            log("Снимка от архива не се изтегли: ${describe(e)}")
+            return ChangeResult.Failed("Не успях да изтегля снимката – провери връзката")
+        }
+        return changeMutex.withLock {
+            withContext(Dispatchers.IO) {
+                try {
+                    setter.apply(File(prepared.file), homeTarget(), settings.value.liveOn)
+                } catch (e: Exception) {
+                    log("Грешка при смяна на тапета: ${describe(e)}")
+                    return@withContext ChangeResult.Failed(describe(e))
+                }
+                val shown = commitShown(prepared, Trigger.MANUAL)
+                pingUnsplash(prepared.candidate)
+                onChanged?.invoke()
+                ChangeResult.Changed(shown)
+            }
+        }
+    }
+
     /** Sets a picture from the history or the favourites. */
     suspend fun applyStored(image: StoredImage): ChangeResult = changeMutex.withLock {
         withContext(Dispatchers.IO) { applyCopyLocked(image, Trigger.MANUAL) }
@@ -701,11 +732,14 @@ class WallpaperEngine(
         candidate: Candidate,
         dest: File = File(imagesDir, fileName(candidate.key) + ".jpg"),
         keep: StoredImage? = null,
+        /** Paintings: the largest size there is, even when it must be enlarged (they were chosen by hand). */
+        relaxed: Boolean = false,
     ): StoredImage {
         val (tw, th, maxW) = sizes()
         // For the panorama a wide rendition is wanted; a picture that has none stays screen-wide.
         val choice = (if (maxW > tw) VariantChooser.choose(candidate.variants, maxW, th) else null)
             ?: VariantChooser.choose(candidate.variants, tw, th)
+            ?: candidate.variants.maxByOrNull { it.width }?.takeIf { relaxed }?.let { VariantChooser.Choice(it.url, it, VariantChooser.upscale(it, tw, th)) }
             ?: throw IllegalStateException("няма достатъчно голям вариант")
         downloadsDir.mkdirs()
         val download = File(downloadsDir, fileName(candidate.key) + ".download")
@@ -715,7 +749,7 @@ class WallpaperEngine(
             val composed = choice.variant.portrait || choice.variant.sizedTemplate
             val manual = keep?.takeIf { it.userCrop && it.hasCrop && it.sourceUrl == choice.url }
                 ?.let { ImageProcessor.CropFraction(it.cropLeft, it.cropTop, it.cropRight, it.cropBottom) }
-            val out = processor.process(download, dest, tw, th, composed, manualCrop = manual, maxTargetW = maxW)
+            val out = processor.process(download, dest, tw, th, composed, manualCrop = manual, allowUpscale = relaxed, maxTargetW = maxW)
             val base = keep ?: StoredImage(candidate, dest.path, out.width, out.height, addedAt = clock())
             return base.copy(
                 file = dest.path, width = out.width, height = out.height,

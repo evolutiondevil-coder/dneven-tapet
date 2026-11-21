@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.outlined.TouchApp
@@ -236,6 +237,11 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         },
                         s.learnTaste,
                     ) { v -> update { it.copy(learnTaste = v) } }
+                    ToggleRow(
+                        Icons.Outlined.Palette, Tint.PINK, "Пауза за изкуство",
+                        "На всеки 20 разгледани снимки – известна картина и историята ѝ",
+                        s.artBreaks,
+                    ) { v -> update { it.copy(artBreaks = v) } }
                     ToggleRow(
                         Icons.Outlined.Translate, Tint.BLUE, "Описания на български",
                         "Заглавията и историите се превеждат на телефона · еднократно ~30 MB при Wi-Fi",
