@@ -41,6 +41,8 @@ class CommonsArtParserTest {
         // Never the original file (Wikimedia limits those): a standard 1920 px rendition.
         assertEquals("https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Small_portrait.jpg/1920px-Small_portrait.jpg", small.fullUrl)
         assertEquals("https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Small_portrait.jpg/1280px-Small_portrait.jpg", small.imageUrl)
+        assertEquals("De slaapkamer", CommonsArtParser.nameFromFile("File:Vincent van Gogh - De slaapkamer - Google Art Project.jpg", "Vincent van Gogh"))
+        assertEquals("Girl with a Pearl Earring", CommonsArtParser.nameFromFile("File:1665 Girl with a Pearl Earring.jpg", ""))
         val c = starry.candidate()
         assertTrue(c.key.startsWith("art:"))
         assertEquals(listOf(3840, 1280), c.variants.map { it.width })

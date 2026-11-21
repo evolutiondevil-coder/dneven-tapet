@@ -140,11 +140,12 @@ object CommonsArtParser {
             val full = thumb ?: thumbOf(original, fullW)
             val fullH = (height.toLong() * fullW / width).toInt()
             val screen = full.replace(px, "/1280px-")
-            val fileName = title.removePrefix("File:").substringBeforeLast('.').replace(" - Google Art Project", "").trim()
+            val artist = Text.clip(value("Artist").lineSequence().firstOrNull().orEmpty().substringBefore(" (").trim(), 80)
+            val fileName = nameFromFile(title, artist)
             Artwork(
                 id = title,
                 title = Text.clip(value("ObjectName").lineSequence().firstOrNull().orEmpty().ifBlank { fileName }, 120),
-                artist = Text.clip(value("Artist").lineSequence().firstOrNull().orEmpty().substringBefore(" (").trim(), 80),
+                artist = artist,
                 date = Text.clip(value("DateTimeOriginal").lineSequence().firstOrNull().orEmpty(), 40),
                 imageUrl = screen,
                 fullUrl = full,
@@ -158,6 +159,14 @@ object CommonsArtParser {
     }
 
     private fun clean(url: String) = url.substringBefore("?utm_").substringBefore("&utm_")
+
+    /** "File:Vincent van Gogh - De slaapkamer - Google Art Project.jpg" → "De slaapkamer". */
+    fun nameFromFile(title: String, artist: String): String {
+        var n = title.removePrefix("File:").substringBeforeLast('.')
+        n = n.replace(Regex(" - Google (Art Project|Cultural Institute)( - edited)?"), "")
+        if (artist.isNotBlank()) n = n.removePrefix("$artist - ").removePrefix("$artist, ")
+        return n.replace(Regex("^\\d{4} "), "").trim()
+    }
 
     /** "…/commons/a/ab/Name.jpg" → "…/commons/thumb/a/ab/Name.jpg/1280px-Name.jpg". */
     fun thumbOf(original: String, width: Int): String {
