@@ -171,7 +171,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                                 Text("Автоматична смяна", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 Text(
                                     when {
-                                        !s.autoChange -> "Задържан – тапетът не се сменя сам"
+                                        !s.autoChange -> "Задържан – не се сменя сам"
                                         next != null -> "Следваща смяна: " + Format.moment(next)
                                         else -> "Смяната е включена"
                                     },
