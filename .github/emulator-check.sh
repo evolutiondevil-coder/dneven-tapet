@@ -69,7 +69,10 @@ shot 01-home-after-tests 4
 # The app from a fresh install: welcome screen, then "Start" downloads and sets the first picture.
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
-shot 02-welcome 5
+shot 01b-language 5
+# First start: the language. Bulgarian (the emulator is English, so the app restarts in Bulgarian).
+tap "Български" && sleep 8
+shot 02-welcome 3
 # Welcome: four short pages ("Напред", "Пропусни" jumps to the last one with "Започни").
 tap "Напред" && shot 02a-welcome-page-2 2
 tap "Пропусни" && shot 02b-welcome-last-page 2
@@ -205,18 +208,20 @@ if [ -n "$REL" ]; then
   adb uninstall bg.dnevnitapet > /dev/null 2>&1
   adb install "$REL"
   adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
-  shot 20-release-welcome 5
+  shot 20-release-language 5
   r0=$(wallpaper_state)
-  tap "Пропусни" && sleep 2
-  tap "Започни" && shot 21-release-main 30
+  # The release APK in English this time (the emulator is English: no restart needed).
+  tap "English" && shot 20b-release-welcome-en 4
+  tap "Skip" && sleep 2
+  tap "Start" && shot 21-release-main 30
   r1=$(wallpaper_state)
-  expect_changed "release APK: Започни set a wallpaper" "$r0" "$r1"
-  tap "Следваща" && shot 22-release-next 4
-  tap "Избери" && shot 23-release-chosen 6
+  expect_changed "release APK (English): Start set a wallpaper" "$r0" "$r1"
+  tap "Next" && shot 22-release-next 4
+  tap "Choose" && shot 23-release-chosen 6
   r2=$(wallpaper_state)
-  expect_changed "release APK: Избери changed the wallpaper" "$r1" "$r2"
-  if has_text "Сегашният ти тапет"; then echo "OK: release APK shows the chosen picture as the wallpaper"; else echo "FAIL: release APK screen after Избери"; fi | tee -a "$OUT/summary.txt"
-  tap "Настройки" && shot 24-release-settings 3
+  expect_changed "release APK (English): Choose changed the wallpaper" "$r1" "$r2"
+  if has_text "Your current wallpaper"; then echo "OK: release APK in English shows the chosen picture"; else echo "FAIL: release APK screen after Choose (English)"; fi | tee -a "$OUT/summary.txt"
+  tap "Settings" && shot 24-release-settings-en 3
 else
   echo "SKIP: no release APK in this run" | tee -a "$OUT/summary.txt"
 fi
