@@ -265,6 +265,32 @@ class WallpaperChangeTest {
         assertTrue("picture not softened: $stats", stats.blurred)
         assertTrue("tilt sensor not listening: $stats", stats.tiltListening)
 
+        // "Нова снимка при всяко отключване": the screen goes off, the phone wakes up with another picture.
+        graph.settings.update {
+            it.copy(changeOnUnlock = true, doubleTapNext = true, tilt = false, readableIcons = bg.dnevnitapet.model.ReadableMode.OFF, eveningDim = false)
+        }
+        Thread.sleep(1000)
+        val beforeSleep = graph.library.value.current?.key
+        shell("input keyevent KEYCODE_SLEEP")
+        Thread.sleep(4000)
+        shell("input keyevent KEYCODE_WAKEUP")
+        Thread.sleep(1000)
+        shell("wm dismiss-keyguard")
+        Thread.sleep(2000)
+        val afterWake = graph.library.value.current?.key
+        Log.i(TAG, "unlock: $beforeSleep -> $afterWake; $stats")
+        assertTrue("no new picture after the screen went off ($stats)", stats.unlockChanges > 0 && beforeSleep != afterWake)
+        // Double tap on an empty spot of the home screen (only logged: two shell taps may be too slow).
+        shell("input keyevent KEYCODE_HOME")
+        Thread.sleep(2000)
+        val beforeTap = graph.library.value.current?.key
+        shell("input tap ${w / 2} ${h * 45 / 100}")
+        shell("input tap ${w / 2} ${h * 45 / 100}")
+        Thread.sleep(2500)
+        Log.i(TAG, "double tap: $beforeTap -> ${graph.library.value.current?.key}; $stats")
+        shell("screencap -p /sdcard/Download/panorama-6-after-double-tap.png")
+        graph.settings.update { it.copy(changeOnUnlock = false, doubleTapNext = false) }
+
         // Switching the panorama and the effects off puts a plain wallpaper back.
         graph.settings.update {
             it.copy(panorama = false, tilt = false, readableIcons = bg.dnevnitapet.model.ReadableMode.OFF, eveningDim = false)

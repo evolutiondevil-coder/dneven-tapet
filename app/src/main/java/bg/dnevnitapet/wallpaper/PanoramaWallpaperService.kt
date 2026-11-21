@@ -1,5 +1,11 @@
 package bg.dnevnitapet.wallpaper
 
+import android.app.WallpaperManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -45,6 +51,50 @@ import kotlin.math.sin
  */
 class PanoramaWallpaperService : WallpaperService() {
     override fun onCreateEngine(): Engine = PanoramaEngine()
+
+    /** Time of the last quick change (unlock or double tap), to keep them apart. */
+    @Volatile private var lastQuickAt = 0L
+
+    /**
+     * "Нова снимка при всяко отключване": when the screen goes off another picture is put, so the
+     * phone wakes up with it. Registered while the live wallpaper runs (it only runs as the wallpaper).
+     */
+    private val screenOff = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val graph = runCatching { Graph.get(this@PanoramaWallpaperService) }.getOrNull() ?: return
+            val s = graph.settings.value
+            if (!s.changeOnUnlock || !s.liveOn) return
+            quickChange(graph, Trigger.UNLOCK, MIN_UNLOCK_GAP_MS)
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        runCatching {
+            ContextCompat.registerReceiver(this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
+        }
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(screenOff) }
+        super.onDestroy()
+    }
+
+    /** Changes the picture right away from what is already on the phone (nothing is downloaded now). */
+    private fun quickChange(graph: bg.dnevnitapet.Graph, trigger: Trigger, minGapMs: Long) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastQuickAt < minGapMs) return
+        lastQuickAt = now
+        graph.appScope.launch {
+            val r = runCatching { graph.engine.quickChange(trigger) }.getOrNull()
+            bg.dnevnitapet.util.Diag.i("quick change ($trigger): ${(r as? ChangeResult.Changed)?.image?.key ?: r}")
+            if (r is ChangeResult.Changed) {
+                if (trigger == Trigger.UNLOCK) Stats.unlockChanges++ else Stats.doubleTaps++
+            }
+            // A double tap used a prepared picture: get the next one ready (Wi-Fi rules apply).
+            if (trigger == Trigger.DOUBLE_TAP) runCatching { graph.scheduler.enqueueRefill() }
+        }
+    }
 
     private inner class PanoramaEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener, SensorEventListener {
         private val handler = Handler(Looper.getMainLooper())
@@ -94,6 +144,21 @@ class PanoramaWallpaperService : WallpaperService() {
         private var downX = 0f
         private var downY = 0f
         private var downAt = 0L
+
+        /** Double tap on an empty spot: the launcher's "tap" commands, or the touches themselves. */
+        private val commandTaps = DoubleTap()
+        private val touchTaps = DoubleTap()
+
+        /** The previous picture fades out over the new one. */
+        private var fadingFrom: Bitmap? = null
+        private var fadeStart = 0L
+        private val fadePaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+        private val fade = object : Runnable {
+            override fun run() {
+                draw()
+                if (fadingFrom != null) handler.postDelayed(this, FRAME_MS)
+            }
+        }
 
         private var animFrom = 0f
         private var animTo = 0f
@@ -208,6 +273,15 @@ class PanoramaWallpaperService : WallpaperService() {
 
         override fun onTouchEvent(event: MotionEvent) {
             if (!isPreview) Stats.touchEvents++
+            if (!isPreview && settings.doubleTapNext && event.actionMasked == MotionEvent.ACTION_UP) {
+                val still = abs(event.x - downX) < 24f && abs(event.y - downY) < 24f && event.eventTime - downAt < 300
+                if (still && touchTaps.tap(event.eventTime, event.x, event.y)) onDoubleTap()
+            }
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                downX = event.x
+                downY = event.y
+                downAt = event.eventTime
+            }
             if (launcherScrolls || isPreview || surfaceW <= 0) return
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -226,6 +300,19 @@ class PanoramaWallpaperService : WallpaperService() {
                     }
                 }
             }
+        }
+
+        /** Launchers send "tap" for a touch on an empty spot of the home screen. */
+        override fun onCommand(action: String?, x: Int, y: Int, z: Int, extras: android.os.Bundle?, resultRequested: Boolean): android.os.Bundle? {
+            if (!isPreview && action == WallpaperManager.COMMAND_TAP && settings.doubleTapNext) {
+                if (commandTaps.tap(SystemClock.uptimeMillis(), x.toFloat(), y.toFloat())) onDoubleTap()
+            }
+            return super.onCommand(action, x, y, z, extras, resultRequested)
+        }
+
+        private fun onDoubleTap() {
+            val graph = runCatching { Graph.get(this@PanoramaWallpaperService) }.getOrNull() ?: return
+            quickChange(graph, Trigger.DOUBLE_TAP, MIN_DOUBLE_TAP_GAP_MS)
         }
 
         override fun onSharedPreferenceChanged(prefs: SharedPreferences?, key: String?) {
@@ -333,6 +420,14 @@ class PanoramaWallpaperService : WallpaperService() {
                 val decoded = runCatching { decode(path, height) }.onFailure { Log.w(TAG, "cannot load $path", it) }.getOrNull()
                 handler.post {
                     if (decoded != null && loadedPath == path) {
+                        // A new picture while the home screen is visible fades in over the old one.
+                        val old = bitmap
+                        if (old != null && visible && !isPreview) {
+                            fadingFrom = old
+                            fadeStart = SystemClock.uptimeMillis()
+                            handler.removeCallbacks(fade)
+                            handler.post(fade)
+                        }
                         bitmap = decoded
                         blurred = null
                         makeBlurred()
@@ -363,13 +458,24 @@ class PanoramaWallpaperService : WallpaperService() {
                 canvas.drawColor(Color.BLACK)
                 val bmp = bitmap ?: return
                 val zoom = if (settings.tilt) Effects.TILT_ZOOM else 1f
+                val old = fadingFrom
+                val fadeT = if (old == null) 1f else ((SystemClock.uptimeMillis() - fadeStart).toFloat() / FADE_MS).coerceIn(0f, 1f)
+                if (old != null && fadeT < 1f) {
+                    val po = WallpaperSize.placement(old.width, old.height, surfaceW, surfaceH, offset, zoom, tiltX, tiltY)
+                    matrix.setScale(po.scale, po.scale)
+                    matrix.postTranslate(po.left, po.top)
+                    canvas.drawBitmap(old, matrix, paint)
+                } else if (old != null) {
+                    fadingFrom = null
+                }
                 val p = WallpaperSize.placement(bmp.width, bmp.height, surfaceW, surfaceH, offset, zoom, tiltX, tiltY)
                 val soft = blurred?.takeIf { settings.readableIcons == ReadableMode.DIM_BLUR }
                 val drawn = soft ?: bmp
                 // The softened copy is smaller: scale it up to the picture's size.
                 matrix.setScale(p.scale * bmp.width / drawn.width, p.scale * bmp.height / drawn.height)
                 matrix.postTranslate(p.left, p.top)
-                canvas.drawBitmap(drawn, matrix, paint)
+                fadePaint.alpha = (fadeT * 255).toInt().coerceIn(0, 255)
+                canvas.drawBitmap(drawn, matrix, if (fadeT < 1f) fadePaint else paint)
                 val dim = dimNow()
                 if (dim > 0f) {
                     dimPaint.color = Color.argb((dim * 255).toInt().coerceIn(0, 255), 0, 0, 0)
@@ -401,10 +507,13 @@ class PanoramaWallpaperService : WallpaperService() {
         @Volatile var blurred = false
         @Volatile var tiltListening = false
         @Volatile var tiltEvents = 0
+        @Volatile var unlockChanges = 0
+        @Volatile var doubleTaps = 0
 
         override fun toString() =
             "draws=$draws offset=$offset offsetEvents=$offsetEvents launcherOffset=$lastLauncherOffset touches=$touchEvents " +
-                "launcherScrolls=$launcherScrolls dim=$dim blurred=$blurred tilt=$tiltListening/$tiltEvents"
+                "launcherScrolls=$launcherScrolls dim=$dim blurred=$blurred tilt=$tiltListening/$tiltEvents " +
+                "unlockChanges=$unlockChanges doubleTaps=$doubleTaps"
     }
 
     companion object {
@@ -416,5 +525,10 @@ class PanoramaWallpaperService : WallpaperService() {
         private const val FALLBACK_SCREENS = 3
         /** Tilt (m/s² of gravity) that moves the picture to the edge of its margin. */
         private const val TILT_RANGE = 2.5f
+        /** How long the old picture takes to fade into the new one. */
+        private const val FADE_MS = 450f
+        /** Screen off again within this time: no new picture (e.g. a quick look at the time). */
+        private const val MIN_UNLOCK_GAP_MS = 8_000L
+        private const val MIN_DOUBLE_TAP_GAP_MS = 1_200L
     }
 }

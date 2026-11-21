@@ -14,6 +14,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -240,6 +243,34 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                 Group("Смяна") {
                     LinkRow(Icons.Outlined.Schedule, Tint.ORANGE, "Колко често", frequencyLabel(s), first = true) { sheet = Sheet.FREQUENCY }
                     LinkRow(Icons.Outlined.Smartphone, Tint.ORANGE, "Къде да се слага", targetLabel(s)) { sheet = Sheet.TARGET }
+                    ToggleRow(
+                        Icons.Outlined.LockOpen, Tint.ORANGE, "Нова снимка при всяко отключване",
+                        "Друга снимка всеки път, когато събудиш телефона", s.changeOnUnlock,
+                        note = "По избор · малко повече батерия",
+                    ) { v -> vm.setLiveOption({ it.copy(changeOnUnlock = v) }, askLive) }
+                    ToggleRow(
+                        Icons.Outlined.TouchApp, Tint.ORANGE, "Двойно докосване на началния екран",
+                        "Докосни два пъти празно място – идва следващата снимка", s.doubleTapNext,
+                        note = "По избор",
+                    ) { v -> vm.setLiveOption({ it.copy(doubleTapNext = v) }, askLive) }
+                    if (s.changeOnUnlock || s.doubleTapNext) {
+                        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (s.target == WallpaperTarget.LOCK) {
+                                Hint("Работи, когато тапетът е и на началния екран – в „Къде да се слага“ избери „Начален екран“ или „И двата“.")
+                            } else {
+                                StatusRow(
+                                    ok = liveActive,
+                                    title = if (liveActive) "Готово – работи" else "Остава една стъпка",
+                                    text = if (liveActive) "Снимките се вземат от вече изтеглените – смяната е мигновена и не хаби интернет."
+                                    else "„Включи“ → „Задай тапет“ → „Начален екран“. Само веднъж.",
+                                    action = if (liveActive) null else ("Включи" to openPanorama),
+                                )
+                            }
+                            if (s.changeOnUnlock && android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
+                                Hint("На Samsung има и вграден „Динамичен заключен екран“ – ползвай само едното от двете.")
+                            }
+                        }
+                    }
                 }
             }
 
@@ -664,7 +695,16 @@ private fun LinkRow(icon: ImageVector, tint: Tint, title: String, subtitle: Stri
 
 /** A row with a switch (the whole row toggles it). */
 @Composable
-private fun ToggleRow(icon: ImageVector, tint: Tint, title: String, subtitle: String, checked: Boolean, first: Boolean = false, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(
+    icon: ImageVector,
+    tint: Tint,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    first: Boolean = false,
+    note: String? = null,
+    onChange: (Boolean) -> Unit,
+) {
     if (!first) RowDivider()
     Row(
         Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
@@ -673,7 +713,11 @@ private fun ToggleRow(icon: ImageVector, tint: Tint, title: String, subtitle: St
     ) {
         IconSquare(icon, tint)
         Spacer(Modifier.width(14.dp))
-        RowTexts(title, subtitle, Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            RowTexts(title, subtitle, Modifier)
+            // "По избор …": options that use a bit more battery or need a permission.
+            if (note != null) OptionalNote(note, Modifier.padding(top = 6.dp))
+        }
         Spacer(Modifier.width(8.dp))
         Switch(checked = checked, colors = choiceSwitchColors(), onCheckedChange = null)
     }
@@ -855,5 +899,18 @@ private fun VendorSteps(onOpenBattery: () -> Unit, onOpenAutoStart: () -> Unit, 
                 TextButton(onClick = onMore) { Text("Още съвети: dontkillmyapp.com") }
             }
         }
+    }
+}
+
+/** Small orange label under an optional setting ("По избор · малко повече батерия"). */
+@Composable
+private fun OptionalNote(text: String, modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(10.dp), color = SelectedOrange.copy(alpha = 0.14f), modifier = modifier) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSystemInDarkTheme()) Color(0xFFFFB74D) else Color(0xFF8A4B00),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+        )
     }
 }

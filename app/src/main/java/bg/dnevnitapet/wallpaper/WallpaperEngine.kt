@@ -31,7 +31,14 @@ import java.io.File
 import java.security.MessageDigest
 import java.time.LocalDate
 
-enum class Trigger { MANUAL, SCHEDULED }
+enum class Trigger {
+    MANUAL,
+    SCHEDULED,
+    /** "Нова снимка при всяко отключване" (the screen went off). */
+    UNLOCK,
+    /** Double tap on the home screen. */
+    DOUBLE_TAP,
+}
 
 /** Short human-readable reason, including the root cause of wrapped errors. */
 internal fun describe(e: Throwable): String {
@@ -358,11 +365,53 @@ class WallpaperEngine(
                 seen = (st.seen + shown.key).distinct().takeLast(SEEN_LIMIT),
                 lastChangeAt = now,
                 lastAutoChangeAt = if (trigger == Trigger.SCHEDULED) now else st.lastAutoChangeAt,
-                log = appendLog(st.log, (if (trigger == Trigger.SCHEDULED) "Автоматична смяна: " else "Смяна: ") + shown.candidate.title),
+                // Changes at every unlock would fill the log; they are not written there.
+                log = if (trigger == Trigger.UNLOCK) st.log else appendLog(st.log, logPrefix(trigger) + shown.candidate.title),
             )
         }
         cleanupFiles()
         return shown
+    }
+
+    private fun logPrefix(trigger: Trigger) = when (trigger) {
+        Trigger.SCHEDULED -> "Автоматична смяна: "
+        Trigger.DOUBLE_TAP -> "Двойно докосване: "
+        else -> "Смяна: "
+    }
+
+    /**
+     * A quick change at an unlock or a double tap, without downloading anything.
+     * Double tap: the next prepared picture, like "Следваща". Unlock (and when nothing is prepared):
+     * the picture shown longest ago comes back, so the already downloaded pictures take turns.
+     * Only own photos: the next own photo.
+     */
+    suspend fun quickChange(trigger: Trigger): ChangeResult {
+        val s = settings.value
+        if (s.photoMode == PhotoMode.MINE || trigger == Trigger.DOUBLE_TAP) {
+            val r = next(trigger, allowDownload = false)
+            if (r !is ChangeResult.NoImage || s.photoMode == PhotoMode.MINE) return r
+        }
+        return rotate(trigger) ?: next(trigger, allowDownload = false)
+    }
+
+    /** The oldest picture of the history comes back (and, for a separate lock screen, the one before it there). */
+    private suspend fun rotate(trigger: Trigger): ChangeResult? = changeMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val s = settings.value
+            val st = library.value
+            val pool = st.history.filter {
+                it.key !in st.blocked && File(it.file).exists() && (s.photoMode == PhotoMode.MIXED || !MyPhotos.isMine(it.key))
+            }
+            val home = pool.lastOrNull() ?: return@withContext null
+            val r = applyCopyLocked(home, trigger)
+            if (r is ChangeResult.Changed && s.lockSeparate) {
+                pool.dropLast(1).lastOrNull()?.let { lock ->
+                    runCatching { setter.apply(File(lock.file), WallpaperTarget.LOCK, live = false) }
+                        .onSuccess { library.update { it.copy(lockCurrent = lock.copy(shownAt = clock())) } }
+                }
+            }
+            r
+        }
     }
 
     // ---------------------------------------------------------------- favourites, blocking

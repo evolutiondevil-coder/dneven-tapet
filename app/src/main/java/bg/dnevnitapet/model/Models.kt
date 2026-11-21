@@ -145,6 +145,10 @@ data class Settings(
     val readableIcons: ReadableMode = ReadableMode.OFF,
     /** In the evening and at night the home-screen picture is dimmed a little. */
     val eveningDim: Boolean = false,
+    /** "Нова снимка при всяко отключване": every time the screen goes off, another picture is put (live wallpaper). */
+    val changeOnUnlock: Boolean = false,
+    /** A double tap on an empty spot of the home screen brings the next picture (live wallpaper). */
+    val doubleTapNext: Boolean = false,
     /** With "И двата": the lock screen gets a different picture at every change. */
     val lockDifferent: Boolean = false,
     /** Prefer the sources and kinds of pictures the user likes (♥) and not the hidden ones. */
@@ -172,9 +176,10 @@ data class Settings(
     /** Panorama that actually applies: only the home screen slides. */
     val panoramaOn: Boolean get() = panorama && target != WallpaperTarget.LOCK
 
-    /** The home screen is drawn by the app's own live wallpaper (panorama or an effect is on). */
+    /** The home screen is drawn by the app's own live wallpaper (panorama, an effect, or unlock/double-tap changes). */
     val liveOn: Boolean
-        get() = target != WallpaperTarget.LOCK && (panorama || tilt || readableIcons != ReadableMode.OFF || eveningDim)
+        get() = target != WallpaperTarget.LOCK &&
+            (panorama || tilt || readableIcons != ReadableMode.OFF || eveningDim || changeOnUnlock || doubleTapNext)
 
     /** The lock screen gets its own picture. */
     val lockSeparate: Boolean get() = target == WallpaperTarget.BOTH && lockDifferent
