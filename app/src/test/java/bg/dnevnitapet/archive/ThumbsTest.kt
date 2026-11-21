@@ -20,6 +20,10 @@ class ThumbsTest {
             ),
         )
         assertEquals(
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Y.jpg/500px-Y.jpg",
+            Thumbs.url(c(ImageVariant("https://upload.wikimedia.org/wikipedia/commons/c/cd/Y.jpg?utm_source=x", 1600, 1200))),
+        )
+        assertEquals(
             "https://assets.science.nasa.gov/dynamicimage/assets/science/psd/apod/2025/a.jpg?w=480&h=480&fit=clip",
             Thumbs.url(c(ImageVariant("https://assets.science.nasa.gov/content/dam/science/psd/apod/2025/a.jpg", 4000, 3000))),
         )

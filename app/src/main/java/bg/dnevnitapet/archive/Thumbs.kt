@@ -11,7 +11,7 @@ object Thumbs {
     /** A rendition about [width] px wide (Wikimedia only has standard widths: 500, 960, 1280). */
     fun url(c: Candidate, width: Int = 480): String? {
         val v = c.variants.minByOrNull { if (it.width > 0) it.width else Int.MAX_VALUE } ?: return null
-        val u = v.url
+        val u = v.url.substringBefore("?utm_")
         val wiki = when {
             width <= 500 -> 500
             width <= 960 -> 960
@@ -20,6 +20,9 @@ object Thumbs {
         return when {
             v.sizedTemplate -> u.replace("{w}", "$width").replace("{h}", "${width * 4 / 3}")
             "/thumb/" in u && wikiThumb.containsMatchIn(u) -> u.replace(wikiThumb, "/${wiki}px-")
+            // An original file on Wikimedia (they limit those): its standard small rendition instead.
+            "upload.wikimedia.org/wikipedia/commons/" in u && Regex("\\.(jpe?g|png)$", RegexOption.IGNORE_CASE).containsMatchIn(u) ->
+                u.replace("/commons/", "/commons/thumb/") + "/${wiki}px-" + u.substringAfterLast('/')
             u.startsWith(NASA_ORIGINAL) -> u.replace(NASA_ORIGINAL, NASA_DYNAMIC).substringBefore('?') + "?w=$width&h=$width&fit=clip"
             u.startsWith(NASA_DYNAMIC) -> u.substringBefore('?') + "?w=$width&h=$width&fit=clip"
             else -> u
