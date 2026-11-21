@@ -81,7 +81,7 @@ class PanoramaWallpaperService : WallpaperService() {
     }
 
     /** Changes the picture right away from what is already on the phone (nothing is downloaded now). */
-    private fun quickChange(graph: bg.dnevnitapet.Graph, trigger: Trigger, minGapMs: Long) {
+    private fun quickChange(graph: bg.dnevnitapet.AppGraph, trigger: Trigger, minGapMs: Long) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastQuickAt < minGapMs) return
         lastQuickAt = now
