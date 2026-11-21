@@ -7,13 +7,14 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import bg.dnevnitapet.i18n.tr
 
 /** Lenient helpers: sources change their answers, so missing fields must never crash. */
 internal fun parseJson(text: String): JsonElement =
     try {
         Json.parseToJsonElement(text)
     } catch (e: Exception) {
-        throw SourceFormatException("Отговорът не е JSON")
+        throw SourceFormatException(tr("Отговорът не е JSON"))
     }
 
 internal fun JsonElement?.obj(): JsonObject? = this as? JsonObject

@@ -14,6 +14,7 @@ import bg.dnevnitapet.sources.int
 import bg.dnevnitapet.sources.obj
 import bg.dnevnitapet.sources.parseJson
 import bg.dnevnitapet.sources.str
+import bg.dnevnitapet.i18n.tr
 
 /**
  * NASA Astronomy Picture of the Day.
@@ -25,7 +26,7 @@ import bg.dnevnitapet.sources.str
  */
 class ApodSource : ImageSource {
     override val id = "apod"
-    override val displayName = "NASA – астрономическа снимка на деня"
+    override val displayName = tr("NASA – астрономическа снимка на деня")
 
     override suspend fun fetch(request: FetchRequest): FetchResult {
         val nextPage = request.cursor?.toIntOrNull() ?: 1
@@ -62,7 +63,7 @@ object ApodParser {
     private const val ORIGINAL = "https://assets.science.nasa.gov/content/dam/science/"
 
     fun parse(json: String): List<Candidate> {
-        val posts = parseJson(json).arr() ?: throw SourceFormatException("NASA: неочакван отговор")
+        val posts = parseJson(json).arr() ?: throw SourceFormatException(tr("NASA: неочакван отговор"))
         return posts.mapNotNull { el ->
             val post = el.obj() ?: return@mapNotNull null
             val rawTitle = Text.decodeEntities(post.child("title").str("rendered").orEmpty())

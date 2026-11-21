@@ -67,6 +67,7 @@ import bg.dnevnitapet.model.WallpaperTarget
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Албуми" (optional): own photos in albums; the home and the lock screen can each take their
@@ -89,14 +90,14 @@ fun AlbumsSection(vm: MainViewModel, st: LibraryState, s: Settings) {
                 ) { Icon(Icons.Outlined.Folder, contentDescription = null, tint = Color(0xFF5B8DEF), modifier = Modifier.size(21.dp)) }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Албуми", style = MaterialTheme.typography.bodyLarge)
+                    Text(tr("Албуми"), style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "Подреди снимките си в албуми и избери кой къде да се показва",
+                        tr("Подреди снимките си в албуми и избери кой къде да се показва"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Surface(shape = RoundedCornerShape(10.dp), color = SelectedOrange.copy(alpha = 0.14f), modifier = Modifier.padding(top = 6.dp)) {
-                        Text("По избор", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                        Text(tr("По избор"), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                     }
                 }
                 Spacer(Modifier.width(8.dp))
@@ -113,9 +114,9 @@ fun AlbumsSection(vm: MainViewModel, st: LibraryState, s: Settings) {
                             album = a,
                             cover = st.myPhotos.firstOrNull { it.key in a.keys }?.file,
                             badge = when {
-                                a.id == s.homeAlbum && a.id == s.lockAlbum -> "И двата"
-                                a.id == s.homeAlbum -> "Начален"
-                                a.id == s.lockAlbum -> "Заключен"
+                                a.id == s.homeAlbum && a.id == s.lockAlbum -> tr("И двата")
+                                a.id == s.homeAlbum -> tr("Начален")
+                                a.id == s.lockAlbum -> tr("Заключен")
                                 else -> null
                             },
                         ) { openAlbum = a.id }
@@ -127,17 +128,17 @@ fun AlbumsSection(vm: MainViewModel, st: LibraryState, s: Settings) {
                                     .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(18.dp)),
                                 contentAlignment = Alignment.Center,
                             ) { Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(32.dp)) }
-                            Text("Нов албум", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
+                            Text(tr("Нов албум"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 6.dp))
                         }
                     }
                 }
                 if (st.albums.isNotEmpty()) {
-                    ScreenAlbumRow(Icons.Outlined.Home, "Начален екран", s.homeAlbum, st.albums) { vm.setScreenAlbum(lock = false, it) }
-                    ScreenAlbumRow(Icons.Outlined.Lock, "Заключен екран", s.lockAlbum, st.albums) { vm.setScreenAlbum(lock = true, it) }
+                    ScreenAlbumRow(Icons.Outlined.Home, tr("Начален екран"), s.homeAlbum, st.albums) { vm.setScreenAlbum(lock = false, it) }
+                    ScreenAlbumRow(Icons.Outlined.Lock, tr("Заключен екран"), s.lockAlbum, st.albums) { vm.setScreenAlbum(lock = true, it) }
                     val hint = when {
-                        s.photoMode == PhotoMode.ONLINE -> "Албумите важат, когато се въртят твоите снимки („Моите снимки“ или „Смесено“ отгоре)."
+                        s.photoMode == PhotoMode.ONLINE -> tr("Албумите важат, когато се въртят твоите снимки („Моите снимки“ или „Смесено“ отгоре).")
                         s.lockAlbum.isNotBlank() && s.target != WallpaperTarget.BOTH ->
-                            "За албум на заключения екран избери „И двата“ в Настройки → Къде да се слага."
+                            tr("За албум на заключения екран избери „И двата“ в Настройки → Къде да се слага.")
                         else -> null
                     }
                     if (hint != null) {
@@ -150,7 +151,7 @@ fun AlbumsSection(vm: MainViewModel, st: LibraryState, s: Settings) {
                     }
                 } else {
                     Text(
-                        "Направи първия си албум с „Нов албум“.",
+                        tr("Направи първия си албум с „Нов албум“."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
@@ -161,7 +162,7 @@ fun AlbumsSection(vm: MainViewModel, st: LibraryState, s: Settings) {
     }
 
     if (naming) {
-        NameDialog(title = "Нов албум", initial = "", onDismiss = { naming = false }) { name ->
+        NameDialog(title = tr("Нов албум"), initial = "", onDismiss = { naming = false }) { name ->
             naming = false
             vm.createAlbum(name) { openAlbum = it }
         }
@@ -197,7 +198,7 @@ private fun AlbumTile(album: Album, cover: String?, badge: String?, onClick: () 
             }
         }
         Text(album.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-        Text("${album.keys.size} ${if (album.keys.size == 1) "снимка" else "снимки"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${album.keys.size} ${if (album.keys.size == 1) tr("снимка") else tr("снимки")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -211,15 +212,15 @@ private fun ScreenAlbumRow(icon: androidx.compose.ui.graphics.vector.ImageVector
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(
-                albums.firstOrNull { it.id == albumId }?.name ?: "Всички мои снимки",
+                albums.firstOrNull { it.id == albumId }?.name ?: tr("Всички мои снимки"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Box {
-            TextButton(onClick = { menu = true }) { Text("Смени") }
+            TextButton(onClick = { menu = true }) { Text(tr("Смени")) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Всички мои снимки") }, onClick = {
+                DropdownMenuItem(text = { Text(tr("Всички мои снимки")) }, onClick = {
                     menu = false
                     onSelect("")
                 })
@@ -247,12 +248,12 @@ private fun AlbumSheet(vm: MainViewModel, album: Album, st: LibraryState, onDism
                 Column(Modifier.weight(1f).padding(start = 8.dp)) {
                     Text(album.name, style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Докосни снимка, за да я сложиш в албума или да я махнеш",
+                        tr("Докосни снимка, за да я сложиш в албума или да я махнеш"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = { renaming = true }) { Text("Преименувай") }
+                TextButton(onClick = { renaming = true }) { Text(tr("Преименувай")) }
             }
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(96.dp),
@@ -279,19 +280,19 @@ private fun AlbumSheet(vm: MainViewModel, album: Album, st: LibraryState, onDism
                                 .border(2.dp, Color.White, CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (inside) Icon(Icons.Filled.Check, contentDescription = "В албума", tint = OnSelectedOrange, modifier = Modifier.size(16.dp))
+                            if (inside) Icon(Icons.Filled.Check, contentDescription = tr("В албума"), tint = OnSelectedOrange, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { deleting = true }) { Text("Изтрий албума", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = onDismiss) { Text("Готово") }
+                TextButton(onClick = { deleting = true }) { Text(tr("Изтрий албума"), color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = onDismiss) { Text(tr("Готово")) }
             }
         }
     }
     if (renaming) {
-        NameDialog(title = "Име на албума", initial = album.name, onDismiss = { renaming = false }) {
+        NameDialog(title = tr("Име на албума"), initial = album.name, onDismiss = { renaming = false }) {
             renaming = false
             vm.renameAlbum(album.id, it)
         }
@@ -299,16 +300,16 @@ private fun AlbumSheet(vm: MainViewModel, album: Album, st: LibraryState, onDism
     if (deleting) {
         AlertDialog(
             onDismissRequest = { deleting = false },
-            title = { Text("Да изтрия ли „${album.name}“?") },
-            text = { Text("Снимките остават в „Моите снимки“ – трие се само албумът.") },
+            title = { Text(tr("Да изтрия ли „{0}“?", album.name)) },
+            text = { Text(tr("Снимките остават в „Моите снимки“ – трие се само албумът.")) },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = false
                     vm.deleteAlbum(album.id)
                     onDismiss()
-                }) { Text("Изтрий") }
+                }) { Text(tr("Изтрий")) }
             },
-            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Отказ") } },
+            dismissButton = { TextButton(onClick = { deleting = false }) { Text(tr("Отказ")) } },
         )
     }
 }
@@ -323,11 +324,11 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it.take(30) },
-                placeholder = { Text("напр. Пътувания") },
+                placeholder = { Text(tr("напр. Пътувания")) },
                 singleLine = true,
             )
         },
-        confirmButton = { TextButton(onClick = { onDone(name) }, enabled = name.isNotBlank()) { Text("Готово") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отказ") } },
+        confirmButton = { TextButton(onClick = { onDone(name) }, enabled = name.isNotBlank()) { Text(tr("Готово")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("Отказ")) } },
     )
 }

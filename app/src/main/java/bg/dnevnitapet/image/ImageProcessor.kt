@@ -13,6 +13,7 @@ import java.io.IOException
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import bg.dnevnitapet.i18n.tr
 
 class ImageTooSmallException(message: String) : IOException(message)
 
@@ -50,7 +51,7 @@ class ImageProcessor {
     ): Output {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(src.path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException("Файлът не е снимка")
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException(tr("Файлът не е снимка"))
 
         val rotation = exifRotation(src)
         val (w, h) = if (rotation == 90 || rotation == 270) bounds.outHeight to bounds.outWidth else bounds.outWidth to bounds.outHeight
@@ -59,7 +60,7 @@ class ImageProcessor {
         if (manualCrop == null && !allowUpscale) {
             val upscale = targetH / min(h.toDouble(), w / aspect)
             if (upscale > VariantChooser.MAX_UPSCALE) {
-                throw ImageTooSmallException("Снимката е с твърде ниска резолюция (${w}x$h)")
+                throw ImageTooSmallException(tr("Снимката е с твърде ниска резолюция ({0}x{1})", w, h))
             }
         }
 
@@ -106,9 +107,9 @@ class ImageProcessor {
     fun loadPreview(src: File, maxSide: Int): Preview {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(src.path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException("Файлът не е снимка")
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IOException(tr("Файлът не е снимка"))
         val rotation = exifRotation(src)
-        val decoded = decodeSampled(src, maxSide) ?: throw IOException("Снимката не може да се декодира")
+        val decoded = decodeSampled(src, maxSide) ?: throw IOException(tr("Снимката не може да се декодира"))
         val upright = rotate(decoded, rotation)
         val (w, h) = if (rotation == 90 || rotation == 270) bounds.outHeight to bounds.outWidth else bounds.outWidth to bounds.outHeight
         return Preview(upright, w, h)
@@ -128,7 +129,7 @@ class ImageProcessor {
     }
 
     private fun smartCrop(src: File, rotation: Int, w: Int, h: Int, aspect: Double): SmartCrop.Rect {
-        val analysis = decodeSampled(src, ANALYSIS_SIDE) ?: throw IOException("Снимката не може да се декодира")
+        val analysis = decodeSampled(src, ANALYSIS_SIDE) ?: throw IOException(tr("Снимката не може да се декодира"))
         val upright = rotate(analysis, rotation)
         try {
             return cropFromAnalysis(upright, w, h, aspect)
@@ -147,7 +148,7 @@ class ImageProcessor {
         } else {
             @Suppress("DEPRECATION")
             BitmapRegionDecoder.newInstance(src.path, false)
-        } ?: throw IOException("Снимката не може да се декодира")
+        } ?: throw IOException(tr("Снимката не може да се декодира"))
         val region = try {
             decoder.decodeRegion(
                 android.graphics.Rect(crop.left, crop.top, crop.right, crop.bottom),
@@ -155,7 +156,7 @@ class ImageProcessor {
                     inSampleSize = sample
                     inPreferredConfig = Bitmap.Config.ARGB_8888
                 },
-            ) ?: throw IOException("Снимката не може да се декодира")
+            ) ?: throw IOException(tr("Снимката не може да се декодира"))
         } finally {
             decoder.recycle()
         }
@@ -167,7 +168,7 @@ class ImageProcessor {
         var sample = 1
         while (crop.height / (sample * 2) >= targetH && crop.width / (sample * 2) >= targetW) sample *= 2
         val decoded = BitmapFactory.decodeFile(src.path, BitmapFactory.Options().apply { inSampleSize = sample })
-            ?: throw IOException("Снимката не може да се декодира")
+            ?: throw IOException(tr("Снимката не може да се декодира"))
         val upright = rotate(decoded, rotation)
         val f = upright.width.toDouble() / uprightW
         val left = (crop.left * f).roundToInt().coerceIn(0, upright.width - 1)

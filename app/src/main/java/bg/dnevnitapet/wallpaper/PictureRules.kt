@@ -5,6 +5,7 @@ import bg.dnevnitapet.model.Category
 import bg.dnevnitapet.model.FrequencyMode
 import bg.dnevnitapet.model.Settings
 import java.time.LocalDateTime
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Според часа, сезона и времето" (optional): which prepared picture suits the moment best.
@@ -12,16 +13,16 @@ import java.time.LocalDateTime
  */
 object PictureRules {
     enum class DayPart(val label: String, val hours: String) {
-        MORNING("Сутрин", "05:00 – 11:00"),
-        DAY("Ден", "11:00 – 18:00"),
-        EVENING("Вечер", "18:00 – 22:00"),
-        NIGHT("Нощ", "22:00 – 05:00"),
+        MORNING(tr("Сутрин"), "05:00 – 11:00"),
+        DAY(tr("Ден"), "11:00 – 18:00"),
+        EVENING(tr("Вечер"), "18:00 – 22:00"),
+        NIGHT(tr("Нощ"), "22:00 – 05:00"),
     }
 
     enum class Season { WINTER, SPRING, SUMMER, AUTUMN }
 
     enum class Sky(val label: String) {
-        CLEAR("ясно"), CLOUDY("облачно"), FOG("мъгла"), RAIN("дъжд"), SNOW("сняг"), STORM("буря")
+        CLEAR(tr("ясно")), CLOUDY(tr("облачно")), FOG(tr("мъгла")), RAIN(tr("дъжд")), SNOW(tr("сняг")), STORM(tr("буря"))
     }
 
     data class Context(val category: Category?, val season: Season?, val sky: Sky?)

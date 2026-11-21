@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import bg.dnevnitapet.art.Artwork
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Пауза за изкуство": after every 20 pictures browsed, a famous painting in a frame, with the
@@ -64,7 +65,7 @@ fun ArtBreak(show: MainViewModel.ArtShow, busy: Boolean, onApply: () -> Unit, on
         ) {
             Surface(shape = RoundedCornerShape(14.dp), color = SelectedOrange.copy(alpha = 0.16f)) {
                 Text(
-                    "🎨 Пауза за изкуство",
+                    tr("🎨 Пауза за изкуство"),
                     color = Color(0xFFFFB74D),
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -111,16 +112,16 @@ fun ArtBreak(show: MainViewModel.ArtShow, busy: Boolean, onApply: () -> Unit, on
                     modifier = Modifier.weight(1f).height(50.dp),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                    else Text("Сложи за тапет", maxLines = 1, softWrap = false)
+                    else Text(tr("Сложи за тапет"), maxLines = 1, softWrap = false)
                 }
                 Button(
                     onClick = onClose,
                     colors = ButtonDefaults.buttonColors(containerColor = SelectedOrange, contentColor = OnSelectedOrange),
                     modifier = Modifier.weight(1f).height(50.dp),
-                ) { Text("Към снимките →", maxLines = 1, softWrap = false) }
+                ) { Text(tr("Към снимките →"), maxLines = 1, softWrap = false) }
             }
             Text(
-                "Идва на всеки 20 разгледани снимки · изключва се от Настройки",
+                tr("Идва на всеки 20 разгледани снимки · изключва се от Настройки"),
                 color = Color(0xFF8E8578),
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,

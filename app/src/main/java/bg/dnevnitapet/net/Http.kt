@@ -2,6 +2,7 @@ package bg.dnevnitapet.net
 
 import java.io.File
 import java.io.IOException
+import bg.dnevnitapet.i18n.tr
 
 /** Minimal HTTP abstraction so that sources can be tested without the network. */
 interface Http {
@@ -14,4 +15,4 @@ interface Http {
     suspend fun ping(url: String, headers: Map<String, String> = emptyMap())
 }
 
-class HttpStatusException(val code: Int, url: String) : IOException("HTTP $code за ${url.substringBefore('?')}")
+class HttpStatusException(val code: Int, url: String) : IOException(tr("HTTP {0} за {1}", code, url.substringBefore('?')))

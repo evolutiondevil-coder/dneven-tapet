@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import bg.dnevnitapet.i18n.tr
 
 /** Home-screen widget: title of the current picture, "favourite" and "next" buttons. */
 class NextWidgetProvider : AppWidgetProvider() {
@@ -52,7 +53,7 @@ class NextWidgetProvider : AppWidgetProvider() {
                 val result = withTimeoutOrNull(25_000) { graph.engine.next(Trigger.MANUAL) }
                 val message = when (result) {
                     is ChangeResult.Changed -> null
-                    is ChangeResult.NoImage, null -> "Няма готови снимки – ще изтегля, когато има интернет"
+                    is ChangeResult.NoImage, null -> tr("Няма готови снимки – ще изтегля, когато има интернет")
                     is ChangeResult.Failed -> result.message
                 }
                 if (message != null) {
@@ -76,7 +77,7 @@ class NextWidgetProvider : AppWidgetProvider() {
                 if (key != null) {
                     val nowFavorite = graph.engine.toggleFavorite(key)
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, if (nowFavorite) "Добавена в любими" else "Махната от любими", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (nowFavorite) tr("Добавена в любими") else tr("Махната от любими"), Toast.LENGTH_SHORT).show()
                     }
                 }
             } finally {
@@ -100,9 +101,9 @@ class NextWidgetProvider : AppWidgetProvider() {
             val st = Graph.get(context).library.value
             val current = st.current
             val title = when {
-                busy -> "Сменям…"
+                busy -> tr("Сменям…")
                 current != null -> Graph.get(context).stories.title(current.candidate)
-                else -> "Дневен тапет"
+                else -> tr("Дневен тапет")
             }
             val favorite = current != null && st.isFavorite(current.key)
             for (id in ids) {

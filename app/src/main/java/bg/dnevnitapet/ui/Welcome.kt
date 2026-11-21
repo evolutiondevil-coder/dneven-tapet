@@ -63,39 +63,40 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import bg.dnevnitapet.i18n.tr
 
 /** Words of the daily greeting. Pure logic, unit-tested. */
 object Greeting {
     fun phrase(hour: Int): String = when (hour) {
-        in 5..10 -> "Добро утро"
-        in 11..17 -> "Добър ден"
-        else -> "Добър вечер"
+        in 5..10 -> tr("Добро утро")
+        in 11..17 -> tr("Добър ден")
+        else -> tr("Добър вечер")
     }
 
     /** "Петък, 20 ноември". */
     fun date(day: LocalDate): String =
-        day.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("bg"))).replaceFirstChar { it.uppercase() }
+        day.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", bg.dnevnitapet.i18n.I18n.locale)).replaceFirstChar { it.uppercase() }
 
     /** The short phrases for opening the app at [time]: by the time of day, the day of the week, and general ones. */
     fun openPhrases(time: java.time.LocalDateTime): List<String> {
         val byTime = when (time.hour) {
-            in 5..10 -> listOf("Добро утро", "Приятна сутрин")
-            in 11..17 -> listOf("Добър ден", "Хубав ден")
-            in 18..21 -> listOf("Добър вечер", "Хубава вечер")
-            else -> listOf("Тиха нощ", "Спокойна нощ")
+            in 5..10 -> listOf(tr("Добро утро"), tr("Приятна сутрин"))
+            in 11..17 -> listOf(tr("Добър ден"), tr("Хубав ден"))
+            in 18..21 -> listOf(tr("Добър вечер"), tr("Хубава вечер"))
+            else -> listOf(tr("Тиха нощ"), tr("Спокойна нощ"))
         }
         val day = when (time.dayOfWeek!!) {
-            java.time.DayOfWeek.MONDAY -> "Приятен понеделник"
-            java.time.DayOfWeek.TUESDAY -> "Приятен вторник"
-            java.time.DayOfWeek.WEDNESDAY -> "Приятна сряда"
-            java.time.DayOfWeek.THURSDAY -> "Приятен четвъртък"
-            java.time.DayOfWeek.FRIDAY -> "Приятен петък"
-            java.time.DayOfWeek.SATURDAY -> "Приятна събота"
-            java.time.DayOfWeek.SUNDAY -> "Приятна неделя"
+            java.time.DayOfWeek.MONDAY -> tr("Приятен понеделник")
+            java.time.DayOfWeek.TUESDAY -> tr("Приятен вторник")
+            java.time.DayOfWeek.WEDNESDAY -> tr("Приятна сряда")
+            java.time.DayOfWeek.THURSDAY -> tr("Приятен четвъртък")
+            java.time.DayOfWeek.FRIDAY -> tr("Приятен петък")
+            java.time.DayOfWeek.SATURDAY -> tr("Приятна събота")
+            java.time.DayOfWeek.SUNDAY -> tr("Приятна неделя")
         }
         // At night the day's wish sounds odd.
         val days = if (time.hour in 5..21) listOf(day) else emptyList()
-        return byTime + days + listOf("Здравей отново", "Радвам се да те видя")
+        return byTime + days + listOf(tr("Здравей отново"), tr("Радвам се да те видя"))
     }
 
     /** One phrase for this opening, never the same as the last one. */
@@ -107,20 +108,20 @@ private class WelcomePage(val icon: ImageVector, val title: String, val text: St
 
 private val pages = listOf(
     WelcomePage(
-        Icons.Outlined.Image, "Нов тапет всеки ден",
-        "Всяка сутрин слагам нова красива снимка – от Bing, Windows Spotlight, Wikimedia и NASA. Не трябва да правиш нищо.",
+        Icons.Outlined.Image, tr("Нов тапет всеки ден"),
+        tr("Всяка сутрин слагам нова красива снимка – от Bing, Windows Spotlight, Wikimedia и NASA. Не трябва да правиш нищо."),
     ),
     WelcomePage(
-        Icons.Outlined.Swipe, "Разглеждай и избирай",
-        "Плъзгай наляво и надясно, за да видиш следващите снимки и историята. „Избери“ слага снимката за тапет, а ♥ я пази в любими.",
+        Icons.Outlined.Swipe, tr("Разглеждай и избирай"),
+        tr("Плъзгай наляво и надясно, за да видиш следващите снимки и историята. „Избери“ слага снимката за тапет, а ♥ я пази в любими."),
     ),
     WelcomePage(
-        Icons.Outlined.AutoAwesome, "Твои снимки и ефекти",
-        "Добави свои снимки от галерията („Моите снимки“), а в Настройки включи панорама, движение при накланяне или по-четливи икони.",
+        Icons.Outlined.AutoAwesome, tr("Твои снимки и ефекти"),
+        tr("Добави свои снимки от галерията („Моите снимки“), а в Настройки включи панорама, движение при накланяне или по-четливи икони."),
     ),
     WelcomePage(
-        Icons.Outlined.BatteryChargingFull, "Последна стъпка",
-        "Разреши работа на заден план, за да не пропускам смяната. После натисни „Започни“ и ще сложа първата снимка.",
+        Icons.Outlined.BatteryChargingFull, tr("Последна стъпка"),
+        tr("Разреши работа на заден план, за да не пропускам смяната. После натисни „Започни“ и ще сложа първата снимка."),
     ),
 )
 
@@ -160,7 +161,7 @@ fun WelcomeScreen(unrestricted: Boolean, busy: Boolean, onAllow: () -> Unit, onS
                         color = Color.Black.copy(alpha = 0.35f),
                         modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp),
                     ) {
-                        Text("Пропусни", color = Color.White, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                        Text(tr("Пропусни"), color = Color.White, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
                     }
                 }
             }
@@ -174,16 +175,16 @@ fun WelcomeScreen(unrestricted: Boolean, busy: Boolean, onAllow: () -> Unit, onS
                             }
                         }
                         Spacer(Modifier.width(12.dp))
-                        Text("Стъпка ${i + 1} от ${pages.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tr("Стъпка {0} от {1}", i + 1, pages.size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text(page.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                     Text(page.text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (i == last) {
                         Spacer(Modifier.height(4.dp))
                         if (unrestricted) {
-                            Text("✓ Работа на заден план: разрешена", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
+                            Text(tr("✓ Работа на заден план: разрешена"), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
                         } else {
-                            OutlinedButton(onClick = onAllow) { Text("Разреши работа на заден план") }
+                            OutlinedButton(onClick = onAllow) { Text(tr("Разреши работа на заден план")) }
                         }
                     }
                 }
@@ -211,8 +212,8 @@ fun WelcomeScreen(unrestricted: Boolean, busy: Boolean, onAllow: () -> Unit, onS
                 ) {
                     when {
                         busy -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        pager.currentPage < last -> Text("Напред", style = MaterialTheme.typography.titleSmall)
-                        else -> Text("Започни", style = MaterialTheme.typography.titleSmall)
+                        pager.currentPage < last -> Text(tr("Напред"), style = MaterialTheme.typography.titleSmall)
+                        else -> Text(tr("Започни"), style = MaterialTheme.typography.titleSmall)
                     }
                 }
             }
@@ -237,8 +238,8 @@ fun WhatsNewSheet(version: String, items: List<ReleaseNotes.Item>, onOpenSetting
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("Обновено до версия $version", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    Text("Какво ново", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(tr("Обновено до версия {0}", version), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(tr("Какво ново"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 }
             }
             items.forEach { item ->
@@ -252,8 +253,8 @@ fun WhatsNewSheet(version: String, items: List<ReleaseNotes.Item>, onOpenSetting
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f).height(50.dp)) { Text("Настройки") }
-                Button(onClick = onDone, modifier = Modifier.weight(1f).height(50.dp)) { Text("Супер") }
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f).height(50.dp)) { Text(tr("Настройки")) }
+                Button(onClick = onDone, modifier = Modifier.weight(1f).height(50.dp)) { Text(tr("Супер")) }
             }
         }
     }
@@ -294,7 +295,7 @@ fun DailyGreeting(greeting: String, date: String, wallpaperLine: String, onDone:
                 color = Color.White,
                 trackColor = Color.White.copy(alpha = 0.25f),
             )
-            TextButton(onClick = onDone) { Text("Докосни, за да продължиш", color = Color.White.copy(alpha = 0.85f)) }
+            TextButton(onClick = onDone) { Text(tr("Докосни, за да продължиш"), color = Color.White.copy(alpha = 0.85f)) }
         }
     }
 }

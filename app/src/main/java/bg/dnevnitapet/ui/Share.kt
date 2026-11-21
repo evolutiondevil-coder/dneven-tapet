@@ -8,6 +8,7 @@ import bg.dnevnitapet.model.StoredImage
 import bg.dnevnitapet.sources.SourceRegistry
 import bg.dnevnitapet.wallpaper.MyPhotos
 import java.io.File
+import bg.dnevnitapet.i18n.tr
 
 /** "Сподели": sends the picture with its name and author to another app (Viber, Messenger, mail…). */
 object Share {
@@ -19,7 +20,7 @@ object Share {
         return listOf(
             c.title,
             c.location.takeIf { it.isNotBlank() && it != c.title },
-            who.takeIf { it.isNotBlank() }?.let { "Снимка: $it" },
+            who.takeIf { it.isNotBlank() }?.let { tr("Снимка: {0}", it) },
             c.infoUrl.takeIf { it.isNotBlank() },
         ).filterNotNull().joinToString("\n")
     }
@@ -43,7 +44,7 @@ object Share {
             clipData = ClipData.newRawUri(image.candidate.title, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        return Intent.createChooser(send, "Сподели снимката")
+        return Intent.createChooser(send, tr("Сподели снимката"))
     }
 
     fun share(context: Context, image: StoredImage): Boolean = runCatching {

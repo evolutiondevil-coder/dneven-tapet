@@ -7,6 +7,7 @@ import okhttp3.Request
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import bg.dnevnitapet.i18n.tr
 
 class OkHttpHttp(
     private val client: OkHttpClient = defaultClient(),
@@ -15,7 +16,7 @@ class OkHttpHttp(
     override suspend fun getText(url: String, headers: Map<String, String>): String = withContext(Dispatchers.IO) {
         client.newCall(request(url, headers)).execute().use { response ->
             if (!response.isSuccessful) throw HttpStatusException(response.code, url)
-            response.body?.string() ?: throw IOException("Празен отговор")
+            response.body?.string() ?: throw IOException(tr("Празен отговор"))
         }
     }
 
@@ -23,13 +24,13 @@ class OkHttpHttp(
         withContext(Dispatchers.IO) {
             client.newCall(request(url, headers)).execute().use { response ->
                 if (!response.isSuccessful) throw HttpStatusException(response.code, url)
-                val body = response.body ?: throw IOException("Празен отговор")
+                val body = response.body ?: throw IOException(tr("Празен отговор"))
                 // Content-Type is not trusted (the Spotlight CDN sends "text/plain" for JPEGs);
                 // the file is validated by decoding it. Only an HTML page (Wi-Fi login portal,
                 // error page) is rejected right away.
                 val type = body.contentType()
-                if (type != null && type.subtype == "html") throw IOException("Не е снимка ($type)")
-                if (body.contentLength() > maxBytes) throw IOException("Файлът е твърде голям")
+                if (type != null && type.subtype == "html") throw IOException(tr("Не е снимка ({0})", type))
+                if (body.contentLength() > maxBytes) throw IOException(tr("Файлът е твърде голям"))
                 dest.parentFile?.mkdirs()
                 val tmp = File(dest.path + ".part")
                 var total = 0L
@@ -40,12 +41,12 @@ class OkHttpHttp(
                             val n = input.read(buffer)
                             if (n < 0) break
                             total += n
-                            if (total > maxBytes) throw IOException("Файлът е твърде голям")
+                            if (total > maxBytes) throw IOException(tr("Файлът е твърде голям"))
                             output.write(buffer, 0, n)
                         }
                     }
                 }
-                if (total == 0L) throw IOException("Празен файл")
+                if (total == 0L) throw IOException(tr("Празен файл"))
                 if (!tmp.renameTo(dest)) {
                     tmp.copyTo(dest, overwrite = true)
                     tmp.delete()

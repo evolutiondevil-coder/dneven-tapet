@@ -22,6 +22,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.File
+import bg.dnevnitapet.i18n.AppLanguage
+import bg.dnevnitapet.i18n.I18n
+import bg.dnevnitapet.i18n.tr
 
 class App : Application() {
     lateinit var graph: AppGraph
@@ -35,7 +38,7 @@ class App : Application() {
             // A crash last time: its reason goes to the log (Настройки → За приложението → Дневник).
             val crash = File(filesDir, CRASH_FILE)
             if (crash.exists()) {
-                runCatching { graph.engine.log("Приложението беше спряло: " + crash.readText().take(600)) }
+                runCatching { graph.engine.log(tr("Приложението беше спряло: ") + crash.readText().take(600)) }
                 crash.delete()
             }
             graph.scheduler.reschedule()
@@ -64,6 +67,13 @@ class AppGraph(private val app: Application) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val http = OkHttpHttp()
     val settings = JsonFileStore(File(app.filesDir, "settings.json"), Settings.serializer()) { Settings() }
+
+    init {
+        // The app's language, before any text is made: the chosen one, or Bulgarian for older
+        // installs, or the phone's language until the first start asks.
+        val s = settings.value
+        I18n.language = AppLanguage.of(s.language) ?: if (s.onboarded) AppLanguage.BG else AppLanguage.fromDevice()
+    }
     val library = JsonFileStore(File(app.filesDir, "library.json"), LibraryState.serializer()) { LibraryState() }
     val engine = WallpaperEngine(app, library, settings, http, WallpaperSetter(app))
     val scheduler = Scheduler(app, engine)

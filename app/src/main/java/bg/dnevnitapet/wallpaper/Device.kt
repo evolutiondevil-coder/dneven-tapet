@@ -18,6 +18,7 @@ import java.io.File
 import java.io.FileInputStream
 import kotlin.math.max
 import kotlin.math.min
+import bg.dnevnitapet.i18n.tr
 
 /** Sets the system wallpaper from a prepared file. */
 class WallpaperSetter(private val context: Context) {
@@ -29,12 +30,12 @@ class WallpaperSetter(private val context: Context) {
     fun apply(file: File, target: WallpaperTarget, live: Boolean = false): Int {
         val wm = WallpaperManager.getInstance(context)
         if (!wm.isWallpaperSupported || !wm.isSetWallpaperAllowed) {
-            throw IllegalStateException("Устройството не позволява смяна на тапета")
+            throw IllegalStateException(tr("Устройството не позволява смяна на тапета"))
         }
         val (sw, sh) = DeviceInfo.screenSize(context)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException("Файлът на снимката е повреден")
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw IllegalStateException(tr("Файлът на снимката е повреден"))
         // Wider than the screen's shape: a panorama file.
         val wide = bounds.outWidth.toLong() * sh > bounds.outHeight.toLong() * sw * 21 / 20
         if (target != WallpaperTarget.LOCK) Panorama.setFile(context, file.path)
@@ -86,7 +87,7 @@ class WallpaperSetter(private val context: Context) {
     private fun stream(wm: WallpaperManager, file: File, flags: Int): Int {
         // The file is already prepared, so it is handed over as is (no re-encoding).
         val id = FileInputStream(file).use { wm.setStream(it, null, true, flags) }
-        if (id <= 0) throw IllegalStateException("Системата не прие тапета")
+        if (id <= 0) throw IllegalStateException(tr("Системата не прие тапета"))
         return id
     }
 
@@ -96,7 +97,7 @@ class WallpaperSetter(private val context: Context) {
         val bmp = middle(file, sw, sh)
         try {
             val id = wm.setBitmap(bmp, null, true, WallpaperManager.FLAG_LOCK)
-            if (id <= 0) throw IllegalStateException("Системата не прие тапета")
+            if (id <= 0) throw IllegalStateException(tr("Системата не прие тапета"))
             return id
         } finally {
             bmp.recycle()
@@ -110,14 +111,14 @@ class WallpaperSetter(private val context: Context) {
         } else {
             @Suppress("DEPRECATION")
             BitmapRegionDecoder.newInstance(file.path, false)
-        } ?: throw IllegalStateException("Снимката не може да се декодира")
+        } ?: throw IllegalStateException(tr("Снимката не може да се декодира"))
         try {
             val w = decoder.width
             val h = decoder.height
             val cw = min(w, (h.toLong() * sw / sh).toInt()).coerceAtLeast(1)
             val left = (w - cw) / 2
             return decoder.decodeRegion(Rect(left, 0, left + cw, h), BitmapFactory.Options())
-                ?: throw IllegalStateException("Снимката не може да се декодира")
+                ?: throw IllegalStateException(tr("Снимката не може да се декодира"))
         } finally {
             decoder.recycle()
         }

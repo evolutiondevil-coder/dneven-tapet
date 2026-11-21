@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Daily Wallpaper</string>
+    <string name="widget_name">Next wallpaper</string>
+    <string name="widget_description">Changes the wallpaper with one tap</string>
+    <string name="tile_label">Next wallpaper</string>
+    <string name="widget_next">Next picture</string>
+    <string name="widget_favorite">Favourite</string>
+    <string name="panorama_label">Daily Wallpaper – panorama</string>
+    <string name="panorama_description">Today\'s picture, wider than the screen: it slides with the home screens</string>
+</resources>

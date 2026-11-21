@@ -41,6 +41,7 @@ import bg.dnevnitapet.model.StoredImage
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
+import bg.dnevnitapet.i18n.tr
 
 /** One action under the picture: an icon in a circle with a short label below it. */
 class SheetAction(
@@ -122,9 +123,9 @@ fun PhotoSheet(
                 if (isCurrent) {
                     Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Това е тапетът ти", maxLines = 1, softWrap = false)
+                    Text(tr("Това е тапетът ти"), maxLines = 1, softWrap = false)
                 } else {
-                    Text("Сложи като тапет", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
+                    Text(tr("Сложи като тапет"), style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
                 }
             }
         }

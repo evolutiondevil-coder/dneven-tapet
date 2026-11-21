@@ -73,7 +73,7 @@ class StoryTranslator(private val context: Context, private val settings: JsonFi
      * tapped "Изтегли сега"); otherwise it waits for Wi-Fi. @return true when translating works.
      */
     suspend fun prepare(anyNetwork: Boolean = false): Boolean = mutex.withLock {
-        if (!settings.value.translateStories) return false
+        if (!settings.value.translateStories || bg.dnevnitapet.i18n.I18n.language != bg.dnevnitapet.i18n.AppLanguage.BG) return false
         if (isReady()) return true
         if (!anyNetwork && !onUnmeteredNetwork()) return false
         val conditions = DownloadConditions.Builder().apply { if (!anyNetwork) requireWifi() }.build()

@@ -62,6 +62,7 @@ import bg.dnevnitapet.story.MapTiles
 import bg.dnevnitapet.story.StoryText
 import bg.dnevnitapet.wallpaper.MyPhotos
 import java.net.URLEncoder
+import bg.dnevnitapet.i18n.tr
 
 private sealed class Translation {
     data object Off : Translation()
@@ -120,7 +121,7 @@ fun InfoSheet(image: StoredImage, onDismiss: () -> Unit, onSave: () -> Unit) {
         ) {
             Surface(shape = RoundedCornerShape(12.dp), color = SelectedOrange.copy(alpha = 0.16f)) {
                 Text(
-                    if (mine) "Твоя снимка" else "Историята на снимката",
+                    if (mine) tr("Твоя снимка") else tr("Историята на снимката"),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -156,15 +157,15 @@ fun InfoSheet(image: StoredImage, onDismiss: () -> Unit, onSave: () -> Unit) {
                         Button(
                             onClick = { openMap(context, place) },
                             colors = ButtonDefaults.buttonColors(containerColor = SelectedOrange, contentColor = OnSelectedOrange),
-                        ) { Text("Покажи на картата") }
+                        ) { Text(tr("Покажи на картата")) }
                     }
                     OutlinedButton(onClick = {
                         val q = URLEncoder.encode(StoryText.wikipediaQuery(story), "UTF-8")
                         open(context, "https://bg.wikipedia.org/w/index.php?search=$q")
-                    }) { Text("Прочети в Уикипедия") }
+                    }) { Text(tr("Прочети в Уикипедия")) }
                 }
             }
-            val credit = listOf(c.author.takeIf { it.isNotBlank() }?.let { "Снимка: $it" }, SourceRegistry.name(c.sourceId).takeIf { !mine })
+            val credit = listOf(c.author.takeIf { it.isNotBlank() }?.let { tr("Снимка: {0}", it) }, SourceRegistry.name(c.sourceId).takeIf { !mine })
                 .filterNotNull().joinToString(" · ") + if (c.date.isNotBlank()) " · " + Format.date(c.date) else ""
             if (credit.isNotBlank()) {
                 Text(credit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -172,18 +173,18 @@ fun InfoSheet(image: StoredImage, onDismiss: () -> Unit, onSave: () -> Unit) {
 
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
             Text(
-                "Размер ${image.width} × ${image.height}" +
+                tr("Размер {0} × {1}", image.width, image.height) +
                     if (c.copyright.isNotBlank() && c.copyright.removePrefix("©").trim() != c.author) " · ${c.copyright}" else "",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (c.infoUrl.isNotBlank()) TextButton(onClick = { open(context, c.infoUrl) }) { Text("Научи повече") }
-                if (!mine) TextButton(onClick = onSave) { Text("Запази в галерията") }
+                if (c.infoUrl.isNotBlank()) TextButton(onClick = { open(context, c.infoUrl) }) { Text(tr("Научи повече")) }
+                if (!mine) TextButton(onClick = onSave) { Text(tr("Запази в галерията")) }
             }
             if (!mine) {
                 Text(
-                    "Снимката е собственост на автора си. Използва се само като личен тапет.",
+                    tr("Снимката е собственост на автора си. Използва се само като личен тапет."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -200,21 +201,21 @@ private fun TranslationLine(t: Translation, showOriginal: Boolean, onToggle: () 
         Translation.Working -> Row(verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
             Spacer(Modifier.width(8.dp))
-            Text("Превеждам на български…", style = MaterialTheme.typography.bodySmall, color = muted)
+            Text(tr("Превеждам на български…"), style = MaterialTheme.typography.bodySmall, color = muted)
         }
         is Translation.Done -> Text(
-            if (showOriginal) "Оригиналният текст · Покажи на български" else "Преведено автоматично · Покажи оригинала",
+            if (showOriginal) tr("Оригиналният текст · Покажи на български") else tr("Преведено автоматично · Покажи оригинала"),
             style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.Underline),
             color = muted,
             modifier = Modifier.clickable(onClick = onToggle).padding(vertical = 4.dp),
         )
         Translation.NeedsWifi -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                "Преводът на български ще се изтегли при Wi-Fi – еднократно, около 30 MB.",
+                tr("Преводът на български ще се изтегли при Wi-Fi – еднократно, около 30 MB."),
                 style = MaterialTheme.typography.bodySmall,
                 color = muted,
             )
-            TextButton(onClick = onDownloadNow, contentPadding = ButtonDefaults.TextButtonContentPadding) { Text("Изтегли сега") }
+            TextButton(onClick = onDownloadNow, contentPadding = ButtonDefaults.TextButtonContentPadding) { Text(tr("Изтегли сега")) }
         }
     }
 }
@@ -225,7 +226,7 @@ private fun MapPreview(bitmap: Bitmap, view: MapTiles.View, onClick: () -> Unit)
     BoxWithConstraints(
         Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick),
     ) {
-        Image(image, contentDescription = "Карта", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(120.dp))
+        Image(image, contentDescription = tr("Карта"), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(120.dp))
         // The pin where the place is (the map is cropped to the box from the middle).
         val density = LocalDensity.current
         val boxW = with(density) { maxWidth.toPx() }

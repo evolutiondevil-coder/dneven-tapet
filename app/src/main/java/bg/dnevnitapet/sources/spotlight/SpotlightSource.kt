@@ -12,6 +12,7 @@ import bg.dnevnitapet.sources.int
 import bg.dnevnitapet.sources.obj
 import bg.dnevnitapet.sources.parseJson
 import bg.dnevnitapet.sources.str
+import bg.dnevnitapet.i18n.tr
 
 /**
  * Windows Spotlight (unofficial endpoints used by Windows itself).
@@ -67,7 +68,7 @@ object SpotlightParser {
 
     private fun items(json: String) =
         parseJson(json).obj().child("batchrsp")?.get("items").arr()
-            ?: throw SourceFormatException("Spotlight: липсва списък")
+            ?: throw SourceFormatException(tr("Spotlight: липсва списък"))
 
     private fun innerAd(element: kotlinx.serialization.json.JsonElement) =
         element.obj().str("item")?.let { runCatching { parseJson(it).obj().child("ad") }.getOrNull() }

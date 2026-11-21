@@ -55,6 +55,7 @@ import bg.dnevnitapet.image.ImageProcessor
 import bg.dnevnitapet.image.VariantChooser
 import kotlin.math.max
 import kotlin.math.roundToInt
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Нагласи": the whole picture with a frame the shape of the phone screen. Drag to move the picture,
@@ -81,12 +82,12 @@ fun CropScreen(vm: MainViewModel, onClose: () -> Unit) {
             ) {
                 Text(s.message, color = Color.White, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
-                OutlinedButton(onClick = close) { Text("Назад", color = Color.White) }
+                OutlinedButton(onClick = close) { Text(tr("Назад"), color = Color.White) }
             }
             else -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(color = Color.White)
                 Spacer(Modifier.height(16.dp))
-                Text("Изтеглям снимката в пълен размер…", color = Color.White)
+                Text(tr("Изтеглям снимката в пълен размер…"), color = Color.White)
             }
         }
     }
@@ -196,9 +197,9 @@ private fun CropEditor(
             Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Нагласи изрязването", color = Color.White, style = MaterialTheme.typography.titleLarge)
+            Text(tr("Нагласи изрязването"), color = Color.White, style = MaterialTheme.typography.titleLarge)
             Text(
-                "Плъзни, за да преместиш. С два пръста – приближи. Двойно докосване – цялата снимка.",
+                tr("Плъзни, за да преместиш. С два пръста – приближи. Двойно докосване – цялата снимка."),
                 color = Color.White.copy(alpha = 0.8f),
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
@@ -215,7 +216,7 @@ private fun CropEditor(
                 modifier = Modifier.weight(1f).height(52.dp),
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-            ) { Text("Отказ", maxLines = 1) }
+            ) { Text(tr("Отказ"), maxLines = 1) }
             Button(
                 onClick = {
                     val w = iw * scale
@@ -233,7 +234,7 @@ private fun CropEditor(
                 modifier = Modifier.weight(1f).height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
             ) {
-                if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black) else Text("Готово", maxLines = 1)
+                if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.Black) else Text(tr("Готово"), maxLines = 1)
             }
         }
         TextButton(
@@ -243,6 +244,6 @@ private fun CropEditor(
                 offset = o
             },
             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 84.dp),
-        ) { Text("Върни както беше", color = Color.White.copy(alpha = 0.85f)) }
+        ) { Text(tr("Върни както беше"), color = Color.White.copy(alpha = 0.85f)) }
     }
 }

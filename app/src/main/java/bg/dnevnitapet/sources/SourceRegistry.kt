@@ -6,6 +6,7 @@ import bg.dnevnitapet.sources.pexels.PexelsSource
 import bg.dnevnitapet.sources.spotlight.SpotlightSource
 import bg.dnevnitapet.sources.unsplash.UnsplashSource
 import bg.dnevnitapet.sources.wikimedia.WikimediaSource
+import bg.dnevnitapet.i18n.tr
 
 /** All known sources. Adding a new one = one class + one line here. */
 object SourceRegistry {
@@ -27,8 +28,8 @@ object SourceRegistry {
         "apod" -> "NASA APOD"
         "unsplash" -> "Unsplash"
         "pexels" -> "Pexels"
-        "mine" -> "Моите снимки"
-        "art" -> "Изкуство"
+        "mine" -> tr("Моите снимки")
+        "art" -> tr("Изкуство")
         else -> id
     }
 }

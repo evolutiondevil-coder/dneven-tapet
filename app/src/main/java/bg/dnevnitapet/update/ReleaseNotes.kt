@@ -10,7 +10,7 @@ object ReleaseNotes {
         val start = lines.indexOfFirst { it.startsWith("## ") }
         if (start < 0) return emptyList()
         return lines.drop(start + 1)
-            .takeWhile { !it.startsWith("## ") && !it.contains("Инсталиране") }
+            .takeWhile { !it.startsWith("## ") && !it.contains("Инсталиране") && !it.contains("**Install") }
             .filter { it.trimStart().startsWith("- ") }
             .map { line ->
                 val clean = line.trim().removePrefix("- ").replace("**", "").trim()

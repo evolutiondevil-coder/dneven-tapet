@@ -1,5 +1,7 @@
 package bg.dnevnitapet.archive
 
+import bg.dnevnitapet.i18n.tr
+
 /**
  * The main colour of a picture, for "търси по цвят". Pure logic on ARGB pixels, unit-tested.
  * Dark and grey pixels do not count; if hardly any pixel is colourful, the picture is "bw".
@@ -12,14 +14,14 @@ object ColorBucket {
     )
 
     fun label(bucket: String): String = when (bucket) {
-        "red" -> "червено"
-        "orange" -> "оранжево"
-        "yellow" -> "жълто"
-        "green" -> "зелено"
-        "teal" -> "синьо-зелено"
-        "blue" -> "синьо"
-        "purple" -> "лилаво"
-        else -> "черно-бяло"
+        "red" -> tr("червено")
+        "orange" -> tr("оранжево")
+        "yellow" -> tr("жълто")
+        "green" -> tr("зелено")
+        "teal" -> tr("синьо-зелено")
+        "blue" -> tr("синьо")
+        "purple" -> tr("лилаво")
+        else -> tr("черно-бяло")
     }
 
     fun of(pixels: IntArray): String {

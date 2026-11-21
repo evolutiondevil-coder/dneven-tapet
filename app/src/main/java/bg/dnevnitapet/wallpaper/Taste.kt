@@ -3,6 +3,7 @@ package bg.dnevnitapet.wallpaper
 import bg.dnevnitapet.model.Candidate
 import bg.dnevnitapet.model.Category
 import kotlin.random.Random
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Учи вкуса ти": favourites (♥) make their source and kind of picture (nature, space, …) come
@@ -99,9 +100,9 @@ object Taste {
             profile.category.filterValues { it < 0.99 }.keys.map(categoryName))
         val parts = mutableListOf<String>()
         if (likedKinds.isNotEmpty() || likedSources.isNotEmpty()) {
-            parts += "По-често: " + (likedKinds + likedSources).take(4).joinToString(", ")
+            parts += tr("По-често: ") + (likedKinds + likedSources).take(4).joinToString(", ")
         }
-        if (less.isNotEmpty()) parts += "по-рядко: " + less.take(3).joinToString(", ")
+        if (less.isNotEmpty()) parts += tr("по-рядко: ") + less.take(3).joinToString(", ")
         return parts.joinToString("; ")
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import bg.dnevnitapet.update.ReleaseInfo
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Има нова версия": shown every time the app starts while a newer version waits on GitHub.
@@ -33,13 +34,13 @@ fun UpdateDialog(release: ReleaseInfo, downloading: Boolean, onUpdate: () -> Uni
     AlertDialog(
         onDismissRequest = { if (!downloading) onLater() },
         icon = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },
-        title = { Text("Нова версия ${release.version}") },
+        title = { Text(tr("Нова версия {0}", release.version)) },
         text = {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
-                val notes = whatsNew(release.notes)
+                val notes = if (bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.BG) whatsNew(release.notes) else ""
                 if (notes.isNotBlank()) Text(notes, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "Инсталира се върху сегашната – настройките, историята и любимите се запазват.",
+                    tr("Инсталира се върху сегашната – настройките, историята и любимите се запазват."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = if (notes.isNotBlank()) 12.dp else 0.dp),
@@ -52,14 +53,14 @@ fun UpdateDialog(release: ReleaseInfo, downloading: Boolean, onUpdate: () -> Uni
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
-                        Text("Изтеглям…")
+                        Text(tr("Изтеглям…"))
                     }
                 } else {
-                    Text("Обнови")
+                    Text(tr("Обнови"))
                 }
             }
         },
-        dismissButton = { TextButton(onClick = onLater, enabled = !downloading) { Text("По-късно") } },
+        dismissButton = { TextButton(onClick = onLater, enabled = !downloading) { Text(tr("По-късно")) } },
     )
 }
 

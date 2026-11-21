@@ -68,6 +68,7 @@ import bg.dnevnitapet.wallpaper.MyPhotos
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Моите снимки": photos picked from the phone's gallery. The app keeps its own copies (the
@@ -92,8 +93,8 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Моите снимки") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") } },
+                title = { Text(tr("Моите снимки")) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("Назад")) } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -102,7 +103,7 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
                 ExtendedFloatingActionButton(
                     onClick = pickPhotos,
                     icon = { Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null) },
-                    text = { Text("Добави снимки") },
+                    text = { Text(tr("Добави снимки")) },
                 )
             }
         },
@@ -121,7 +122,7 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
                 Column(Modifier.padding(vertical = 8.dp)) {
                     val progress = importing
                     if (progress != null) {
-                        Text("Добавям снимки… ${progress.first} от ${progress.second}", style = MaterialTheme.typography.bodyMedium)
+                        Text(tr("Добавям снимки… {0} от {1}", progress.first, progress.second), style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.size(6.dp))
                         LinearProgressIndicator(
                             progress = { if (progress.second == 0) 0f else progress.first.toFloat() / progress.second },
@@ -129,12 +130,12 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
                         )
                     } else {
                         Text(
-                            if (st.myPhotos.isEmpty()) "Още нямаш добавени снимки."
-                            else "${st.myPhotos.size} снимки · ${Format.megabytes(bytes)} · до ${MyPhotos.MAX_PHOTOS}",
+                            if (st.myPhotos.isEmpty()) tr("Още нямаш добавени снимки.")
+                            else tr("{0} снимки · {1} · до {2}", st.myPhotos.size, Format.megabytes(bytes), MyPhotos.MAX_PHOTOS),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(
-                            "Приложението пази свои копия, нагодени за екрана. Снимките в галерията не се променят и не се трият.",
+                            tr("Приложението пази свои копия, нагодени за екрана. Снимките в галерията не се променят и не се трият."),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -164,14 +165,14 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
                             modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
                         ) {
                             Text(
-                                "Сега", color = MaterialTheme.colorScheme.onPrimary,
+                                tr("Сега"), color = MaterialTheme.colorScheme.onPrimary,
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
                     }
                     if (blocked) {
-                        Icon(Icons.Filled.Block, contentDescription = "Скрита", tint = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
+                        Icon(Icons.Filled.Block, contentDescription = tr("Скрита"), tint = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
                     }
                 }
             }
@@ -183,25 +184,25 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
         PhotoSheet(
             image = photo,
             title = photo.candidate.description.ifBlank { photo.candidate.title },
-            subtitle = if (blocked) "Скрита – не се показва в редуването" else "",
+            subtitle = if (blocked) tr("Скрита – не се показва в редуването") else "",
             actions = listOfNotNull(
-                SheetAction(Icons.Outlined.Crop, "Нагласи") {
+                SheetAction(Icons.Outlined.Crop, tr("Нагласи")) {
                     vm.openCrop(photo)
                     selected = null
                     onOpenCrop()
                 },
                 if (blocked) {
-                    SheetAction(Icons.Outlined.Visibility, "Покажи") {
+                    SheetAction(Icons.Outlined.Visibility, tr("Покажи")) {
                         vm.unblock(photo.key)
                         selected = null
                     }
                 } else {
                     null
                 },
-                SheetAction(Icons.Outlined.Share, "Сподели") {
-                    if (!Share.share(context, photo)) vm.hint("Няма приложение, с което да се сподели")
+                SheetAction(Icons.Outlined.Share, tr("Сподели")) {
+                    if (!Share.share(context, photo)) vm.hint(tr("Няма приложение, с което да се сподели"))
                 },
-                SheetAction(Icons.Outlined.Delete, "Махни") {
+                SheetAction(Icons.Outlined.Delete, tr("Махни")) {
                     vm.removeMine(photo.key)
                     selected = null
                 },
@@ -246,16 +247,16 @@ fun PhotoModeCard(
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(vertical = 8.dp)) {
             Text(
-                "Какви снимки да се въртят",
+                tr("Какви снимки да се въртят"),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             )
-            ModeRow("Снимки от интернет", "Bing, Spotlight, Wikimedia, NASA…", mode == PhotoMode.ONLINE) { choose(PhotoMode.ONLINE) }
-            ModeRow("Моите снимки от телефона", "Само снимките, добавени тук – в разбъркан ред", mode == PhotoMode.MINE) { choose(PhotoMode.MINE) }
-            ModeRow("Смесено", "Редуват се: една твоя, една от интернет", mode == PhotoMode.MIXED) { choose(PhotoMode.MIXED) }
+            ModeRow(tr("Снимки от интернет"), "Bing, Spotlight, Wikimedia, NASA…", mode == PhotoMode.ONLINE) { choose(PhotoMode.ONLINE) }
+            ModeRow(tr("Моите снимки от телефона"), tr("Само снимките, добавени тук – в разбъркан ред"), mode == PhotoMode.MINE) { choose(PhotoMode.MINE) }
+            ModeRow(tr("Смесено"), tr("Редуват се: една твоя, една от интернет"), mode == PhotoMode.MIXED) { choose(PhotoMode.MIXED) }
             if (importing != null) {
                 Text(
-                    "Добавям снимки… ${importing.first} от ${importing.second}",
+                    tr("Добавям снимки… {0} от {1}", importing.first, importing.second),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 )
@@ -263,12 +264,12 @@ fun PhotoModeCard(
                 Button(onClick = onAddPhotos, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (hasPhotos) "Добави още снимки" else "Избери снимки от телефона")
+                    Text(if (hasPhotos) tr("Добави още снимки") else tr("Избери снимки от телефона"))
                 }
             }
             if (mode != PhotoMode.ONLINE && !hasPhotos && importing == null) {
                 Text(
-                    "Добави поне една снимка, иначе няма какво да се върти.",
+                    tr("Добави поне една снимка, иначе няма какво да се върти."),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),

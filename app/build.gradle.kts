@@ -108,7 +108,7 @@ dependencies {
 // "Какво ново": the release notes travel inside the app (shown once after an update).
 val releaseNotesDir = layout.buildDirectory.dir("generated/releaseNotes")
 val copyReleaseNotes = tasks.register<Copy>("copyReleaseNotes") {
-    from(rootProject.file("RELEASE_NOTES.md"))
+    from(rootProject.file("RELEASE_NOTES.md"), rootProject.file("RELEASE_NOTES.en.md"))
     into(releaseNotesDir)
 }
 android.sourceSets.getByName("main").assets.srcDir(releaseNotesDir)

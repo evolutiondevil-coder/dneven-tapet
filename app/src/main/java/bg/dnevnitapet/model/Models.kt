@@ -137,6 +137,8 @@ enum class PhotoMode {
 @Serializable
 data class Settings(
     val onboarded: Boolean = false,
+    /** "bg" or "en"; "" = not chosen yet (asked at the first start; older installs are Bulgarian). */
+    val language: String = "",
     val autoChange: Boolean = true,
     val photoMode: PhotoMode = PhotoMode.ONLINE,
     val target: WallpaperTarget = WallpaperTarget.HOME,

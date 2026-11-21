@@ -16,6 +16,7 @@ import bg.dnevnitapet.sources.parseJson
 import bg.dnevnitapet.sources.searchQuery
 import bg.dnevnitapet.sources.str
 import java.net.URLEncoder
+import bg.dnevnitapet.i18n.tr
 
 /** Unsplash official API, with the user's own free "Access Key". Searches by category. */
 class UnsplashSource : ImageSource {
@@ -45,7 +46,7 @@ object UnsplashParser {
     fun parse(json: String, category: Category?): List<Candidate> {
         val root = parseJson(json)
         val photos = root.arr() ?: root.obj()?.let { kotlinx.serialization.json.JsonArray(listOf(it)) }
-            ?: throw SourceFormatException("Unsplash: неочакван отговор")
+            ?: throw SourceFormatException(tr("Unsplash: неочакван отговор"))
         return photos.mapNotNull { el ->
             val p = el.obj() ?: return@mapNotNull null
             val id = p.str("id") ?: return@mapNotNull null
@@ -57,7 +58,7 @@ object UnsplashParser {
             val name = user.str("name").orEmpty()
             val title = p.str("description")?.takeIf { it.isNotBlank() }
                 ?: p.str("alt_description")?.replaceFirstChar { it.uppercase() }
-                ?: "Снимка от Unsplash"
+                ?: tr("Снимка от Unsplash")
             Candidate(
                 key = "unsplash:$id",
                 sourceId = "unsplash",

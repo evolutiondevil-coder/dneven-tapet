@@ -2,16 +2,17 @@ package bg.dnevnitapet.sources
 
 import bg.dnevnitapet.model.Candidate
 import bg.dnevnitapet.model.Category
+import bg.dnevnitapet.i18n.tr
 
 val Category.label: String
     get() = when (this) {
-        Category.NATURE -> "Природа"
-        Category.MOUNTAINS -> "Планини"
-        Category.SEA -> "Море"
-        Category.CITIES -> "Градове"
-        Category.SPACE -> "Космос"
-        Category.ANIMALS -> "Животни"
-        Category.ARCHITECTURE -> "Архитектура"
+        Category.NATURE -> tr("Природа")
+        Category.MOUNTAINS -> tr("Планини")
+        Category.SEA -> tr("Море")
+        Category.CITIES -> tr("Градове")
+        Category.SPACE -> tr("Космос")
+        Category.ANIMALS -> tr("Животни")
+        Category.ARCHITECTURE -> tr("Архитектура")
     }
 
 /** Search words used for sources that support searching (Unsplash, Pexels). */

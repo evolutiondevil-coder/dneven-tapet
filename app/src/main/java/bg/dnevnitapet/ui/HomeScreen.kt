@@ -131,6 +131,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import bg.dnevnitapet.i18n.tr
 
 /**
  * Main screen: the pictures as a swipeable gallery (history ← current wallpaper → upcoming),
@@ -276,10 +277,10 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val upcomingNumber = page - (if (currentIndex >= 0) currentIndex else historyCount - 1)
     val position = when {
         shown == null -> ""
-        isCurrent -> if (shownIsMine) "Сегашният ти тапет · моя снимка" else "Сегашният ти тапет"
-        page < historyCount -> "От историята · " + Format.moment(shown.shownAt)
-        onlineView -> "От интернет · $upcomingNumber"
-        else -> "Предстояща $upcomingNumber" + if (shownIsMine) " · моя снимка" else ""
+        isCurrent -> if (shownIsMine) tr("Сегашният ти тапет · моя снимка") else tr("Сегашният ти тапет")
+        page < historyCount -> tr("От историята · ") + Format.moment(shown.shownAt)
+        onlineView -> tr("От интернет · {0}", upcomingNumber)
+        else -> tr("Предстояща {0}", upcomingNumber) + if (shownIsMine) tr(" · моя снимка") else ""
     }
 
     Box(Modifier.fillMaxSize().background(Color(0xFF101418))) {
@@ -336,7 +337,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "Дневен тапет",
+                        tr("Дневен тапет"),
                         color = Color.White.copy(alpha = 0.92f),
                         style = MaterialTheme.typography.titleMedium.copy(shadow = TextShadow),
                         maxLines = 1,
@@ -345,19 +346,19 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                         modifier = Modifier.padding(start = 16.dp).weight(1f),
                     )
                     IconButton(onClick = { onNavigate(Screen.ARCHIVE) }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Архив", tint = Color.White)
+                        Icon(Icons.Filled.Search, contentDescription = tr("Архив"), tint = Color.White)
                     }
                     IconButton(onClick = { onNavigate(Screen.HISTORY) }) {
-                        Icon(Icons.Filled.History, contentDescription = "История", tint = Color.White)
+                        Icon(Icons.Filled.History, contentDescription = tr("История"), tint = Color.White)
                     }
                     IconButton(onClick = { onNavigate(Screen.MY_PHOTOS) }) {
-                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Моите снимки", tint = Color.White)
+                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = tr("Моите снимки"), tint = Color.White)
                     }
                     IconButton(onClick = { onNavigate(Screen.FAVORITES) }) {
-                        Icon(Icons.Outlined.PhotoLibrary, contentDescription = "Любими", tint = Color.White)
+                        Icon(Icons.Outlined.PhotoLibrary, contentDescription = tr("Любими"), tint = Color.White)
                     }
                     IconButton(onClick = { onNavigate(Screen.SETTINGS) }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Настройки", tint = Color.White)
+                        Icon(Icons.Filled.Settings, contentDescription = tr("Настройки"), tint = Color.White)
                     }
                 }
                 if (showSourceSwitch) {
@@ -383,7 +384,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Warning, null, tint = Color(0xFFFFD58A), modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Телефонът може да спира смяната – настрой", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                                Text(tr("Телефонът може да спира смяната – настрой"), color = Color.White, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
@@ -394,7 +395,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                             if (shown != null && !isCurrent) {
                                 Surface(onClick = vm::showCurrent, shape = RoundedCornerShape(50), color = Color(0xCC2D5DA8)) {
                                     Text(
-                                        "$position  ·  към сегашния",
+                                        tr("{0}  ·  към сегашния", position),
                                         color = Color.White,
                                         style = MaterialTheme.typography.labelMedium,
                                         maxLines = 1,
@@ -432,17 +433,17 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                             IconButton(onClick = { vm.toggleFavorite(shown.key) }) {
                                 Icon(
                                     if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                    contentDescription = if (isFavorite) "Махни от любими" else "Добави в любими",
+                                    contentDescription = if (isFavorite) tr("Махни от любими") else tr("Добави в любими"),
                                     tint = if (isFavorite) Color(0xFFFF8A95) else Color.White,
                                 )
                             }
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Filled.MoreVert, contentDescription = "Още", tint = Color.White)
+                                    Icon(Icons.Filled.MoreVert, contentDescription = tr("Още"), tint = Color.White)
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Информация за снимката") },
+                                        text = { Text(tr("Информация за снимката")) },
                                         leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
@@ -450,7 +451,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Нагласи изрязването") },
+                                        text = { Text(tr("Нагласи изрязването")) },
                                         leadingIcon = { Icon(Icons.Filled.Crop, contentDescription = null) },
                                         enabled = !busy,
                                         onClick = {
@@ -461,7 +462,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                     )
                                     if (!shownIsMine) {
                                         DropdownMenuItem(
-                                            text = { Text("Запази в галерията") },
+                                            text = { Text(tr("Запази в галерията")) },
                                             leadingIcon = { Icon(Icons.Filled.Download, contentDescription = null) },
                                             onClick = {
                                                 menuOpen = false
@@ -470,15 +471,15 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                         )
                                     }
                                     DropdownMenuItem(
-                                        text = { Text("Сподели") },
+                                        text = { Text(tr("Сподели")) },
                                         leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
-                                            if (!Share.share(context, shown)) vm.hint("Няма приложение, с което да се сподели")
+                                            if (!Share.share(context, shown)) vm.hint(tr("Няма приложение, с което да се сподели"))
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Не показвай повече") },
+                                        text = { Text(tr("Не показвай повече")) },
                                         leadingIcon = { Icon(Icons.Filled.Block, contentDescription = null) },
                                         enabled = !busy,
                                         onClick = {
@@ -490,9 +491,9 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                     val next = remember(st.lastChangeAt, settings, resumeTick) { vm.nextPlanned() }
                                     Text(
                                         when {
-                                            !settings.autoChange -> "Тапетът е задържан – не се сменя сам"
-                                            next != null -> "Следваща смяна: " + Format.moment(next)
-                                            else -> "Готови снимки: ${st.queue.size}"
+                                            !settings.autoChange -> tr("Тапетът е задържан – не се сменя сам")
+                                            next != null -> tr("Следваща смяна: ") + Format.moment(next)
+                                            else -> tr("Готови снимки: {0}", st.queue.size)
                                         },
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -512,7 +513,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                         )
                     } else {
                         Text(
-                            if (loadingMore || busy) "Изтеглям снимки…" else "Няма повече готови снимки",
+                            if (loadingMore || busy) tr("Изтеглям снимки…") else tr("Няма повече готови снимки"),
                             color = Color.White,
                             style = MaterialTheme.typography.titleMedium.copy(shadow = TextShadow),
                             modifier = Modifier.padding(top = 6.dp),
@@ -525,17 +526,17 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        RoundNav(Icons.AutoMirrored.Filled.ArrowBack, "Предишна", loading = false) {
-                            bg.dnevnitapet.util.Diag.i("tap Предишна page=${pagerState.currentPage} size=${list.size}")
+                        RoundNav(Icons.AutoMirrored.Filled.ArrowBack, tr("Предишна"), loading = false) {
+                            bg.dnevnitapet.util.Diag.i(tr("tap Предишна page={0} size={1}", pagerState.currentPage, list.size))
                             if (pagerState.currentPage > 0) {
                                 scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
                             } else {
-                                vm.hint("Това е най-старата снимка в историята")
+                                vm.hint(tr("Това е най-старата снимка в историята"))
                             }
                         }
                         Button(
                             onClick = {
-                                bg.dnevnitapet.util.Diag.i("tap Избери page=${pagerState.currentPage} shown=${shown?.key}")
+                                bg.dnevnitapet.util.Diag.i(tr("tap Избери page={0} shown={1}", pagerState.currentPage, shown?.key))
                                 shown?.let { vm.choose(it.key) }
                             },
                             enabled = shown != null && !isCurrent && !busy,
@@ -553,13 +554,13 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                 isCurrent -> {
                                     Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Това е тапетът ти", maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                                    Text(tr("Това е тапетът ти"), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
                                 }
-                                else -> Text("Избери", maxLines = 1, softWrap = false, style = MaterialTheme.typography.titleMedium)
+                                else -> Text(tr("Избери"), maxLines = 1, softWrap = false, style = MaterialTheme.typography.titleMedium)
                             }
                         }
-                        RoundNav(Icons.AutoMirrored.Filled.ArrowForward, "Следваща", loading = loadingMore) {
-                            bg.dnevnitapet.util.Diag.i("tap Следваща page=${pagerState.currentPage} size=${list.size} scrolling=${pagerState.isScrollInProgress}")
+                        RoundNav(Icons.AutoMirrored.Filled.ArrowForward, tr("Следваща"), loading = loadingMore) {
+                            bg.dnevnitapet.util.Diag.i(tr("tap Следваща page={0} size={1} scrolling={2}", pagerState.currentPage, list.size, pagerState.isScrollInProgress))
                             if (pagerState.currentPage < list.size) {
                                 scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                             } else {
@@ -599,7 +600,14 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
 
         // First start: four short pages about the app.
         if (!settings.onboarded) {
-            WelcomeScreen(unrestricted, busy, onAllow = { Power.requestUnrestricted(context) }, onStart = vm::startOnboarding)
+            if (settings.language.isBlank()) {
+                // First start: the language first.
+                LanguagePicker(suggested = bg.dnevnitapet.i18n.I18n.language) { lang ->
+                    context.findActivity()?.let { vm.setLanguage(lang, it) }
+                }
+            } else {
+                WelcomeScreen(unrestricted, busy, onAllow = { Power.requestUnrestricted(context) }, onStart = vm::startOnboarding)
+            }
         }
         // First opening of the day: "Добро утро" and today's picture.
         val greeting by vm.greeting.collectAsStateWithLifecycle()
@@ -651,10 +659,10 @@ private fun EndPage(
             if (loading) {
                 CircularProgressIndicator(color = Color.White)
                 Spacer(Modifier.height(16.dp))
-                Text("Изтеглям още снимки…", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(tr("Изтеглям още снимки…"), color = Color.White, style = MaterialTheme.typography.titleMedium)
             } else if (onboarded && onlyMine) {
                 Text(
-                    if (empty) "Още нямаш добавени снимки." else "Това са всичките ти снимки.\nПлъзни назад или добави още.",
+                    if (empty) tr("Още нямаш добавени снимки.") else tr("Това са всичките ти снимки.\nПлъзни назад или добави още."),
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
@@ -664,10 +672,10 @@ private fun EndPage(
                     onClick = onAddPhotos,
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                ) { Text("Добави снимки") }
+                ) { Text(tr("Добави снимки")) }
             } else if (onboarded) {
                 Text(
-                    "Няма повече готови снимки.\nПлъзни назад или опитай пак.",
+                    tr("Няма повече готови снимки.\nПлъзни назад или опитай пак."),
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
@@ -677,7 +685,7 @@ private fun EndPage(
                     onClick = onRetry,
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                ) { Text("Опитай пак") }
+                ) { Text(tr("Опитай пак")) }
             }
         }
     }
@@ -729,7 +737,7 @@ private fun HoldChip(held: Boolean, onClick: () -> Unit) {
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                if (held) "Пусни" else "Задръж",
+                if (held) tr("Пусни") else tr("Задръж"),
                 color = Color.White,
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
@@ -747,8 +755,8 @@ private fun HoldChip(held: Boolean, onClick: () -> Unit) {
 private fun SourceSwitch(online: Boolean, onSelect: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     Surface(shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = 0.38f), modifier = modifier) {
         Row(Modifier.padding(3.dp)) {
-            SwitchPart("Моите снимки", selected = !online) { onSelect(false) }
-            SwitchPart("От интернет", selected = online) { onSelect(true) }
+            SwitchPart(tr("Моите снимки"), selected = !online) { onSelect(false) }
+            SwitchPart(tr("От интернет"), selected = online) { onSelect(true) }
         }
     }
 }

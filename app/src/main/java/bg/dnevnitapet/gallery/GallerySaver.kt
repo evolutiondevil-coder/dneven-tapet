@@ -17,6 +17,7 @@ import bg.dnevnitapet.wallpaper.DeviceInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import bg.dnevnitapet.i18n.tr
 
 /**
  * Saves a picture to the phone's gallery (Pictures/Дневен тапет). Tries the full-resolution original
@@ -46,7 +47,7 @@ class GallerySaver(private val context: Context, private val http: Http) {
                         // fall back to the local copy
                     }
                 }
-                if (!source.exists()) error("Файлът липсва")
+                if (!source.exists()) error(tr("Файлът липсва"))
 
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(source.path, bounds)
@@ -78,9 +79,9 @@ class GallerySaver(private val context: Context, private val http: Http) {
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
         val resolver = context.contentResolver
-        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error("Галерията отказа записа")
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: error(tr("Галерията отказа записа"))
         try {
-            resolver.openOutputStream(uri)?.use { out -> source.inputStream().use { it.copyTo(out) } } ?: error("Записът не успя")
+            resolver.openOutputStream(uri)?.use { out -> source.inputStream().use { it.copyTo(out) } } ?: error(tr("Записът не успя"))
             values.clear()
             values.put(MediaStore.Images.Media.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
@@ -92,9 +93,9 @@ class GallerySaver(private val context: Context, private val http: Http) {
 
     @Suppress("DEPRECATION")
     private fun saveLegacy(source: File, name: String, ext: String, mime: String) {
-        if (needsPermission()) error("Няма разрешение за запис на снимки")
+        if (needsPermission()) error(tr("Няма разрешение за запис на снимки"))
         val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), ALBUM)
-        if (!dir.exists() && !dir.mkdirs()) error("Не мога да създам папката за снимки")
+        if (!dir.exists() && !dir.mkdirs()) error(tr("Не мога да създам папката за снимки"))
         var dest = File(dir, "$name.$ext")
         var n = 2
         while (dest.exists()) dest = File(dir, "$name ($n).$ext").also { n++ }

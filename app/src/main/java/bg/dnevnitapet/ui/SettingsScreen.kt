@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -117,9 +118,10 @@ import bg.dnevnitapet.sources.SourceRegistry
 import bg.dnevnitapet.sources.label
 import bg.dnevnitapet.util.Power
 import bg.dnevnitapet.wallpaper.Panorama
+import bg.dnevnitapet.i18n.tr
 
 /** The bottom sheets that hold the details behind a row with ›. */
-private enum class Sheet { PHOTOS, FREQUENCY, TARGET, RULES, SOURCES, CATEGORIES, NETWORK, RELIABILITY, MEMORY, ABOUT }
+private enum class Sheet { PHOTOS, FREQUENCY, TARGET, RULES, SOURCES, CATEGORIES, NETWORK, RELIABILITY, MEMORY, ABOUT, LANGUAGE }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,7 +146,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     val updateState by vm.updateState.collectAsStateWithLifecycle()
     val pickPhotos = rememberPhotoPicker(vm)
     val openPanorama = {
-        if (!Panorama.openPicker(context)) vm.hint("Телефонът няма екран за живи тапети – ефектите не могат да се включат.")
+        if (!Panorama.openPicker(context)) vm.hint(tr("Телефонът няма екран за живи тапети – ефектите не могат да се включат."))
     }
     val askLive = { if (!Panorama.isActive(context)) openPanorama() }
     var unusedPause by remember { mutableStateOf<Boolean?>(null) }
@@ -162,8 +164,8 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Настройки") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } },
+                title = { Text(tr("Настройки")) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Назад")) } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -178,12 +180,12 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text("Автоматична смяна", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text(tr("Автоматична смяна"), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 Text(
                                     when {
-                                        !s.autoChange -> "Задържан – не се сменя сам"
-                                        next != null -> "Следваща смяна: " + Format.moment(next)
-                                        else -> "Смяната е включена"
+                                        !s.autoChange -> tr("Задържан – не се сменя сам")
+                                        next != null -> tr("Следваща смяна: ") + Format.moment(next)
+                                        else -> tr("Смяната е включена")
                                     },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
@@ -195,10 +197,10 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             StatusChip(
-                                if (problems == 0) "✓ Работи надеждно" else "⚠ Телефонът може да спира смяната",
+                                if (problems == 0) tr("✓ Работи надеждно") else tr("⚠ Телефонът може да спира смяната"),
                                 good = problems == 0,
                             ) { sheet = Sheet.RELIABILITY }
-                            StatusChip("Готови снимки: ${st.queue.size}", good = null) { sheet = Sheet.MEMORY }
+                            StatusChip(tr("Готови снимки: {0}", st.queue.size), good = null) { sheet = Sheet.MEMORY }
                         }
                     }
                 }
@@ -212,11 +214,11 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                             Icon(Icons.Outlined.SystemUpdate, null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text("Нова версия ${r.version}", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                                Text("Настройките и любимите се запазват", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                Text(tr("Нова версия {0}", r.version), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                Text(tr("Настройките и любимите се запазват"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
                             }
                             Button(onClick = vm::installUpdate, enabled = updateState != MainViewModel.UpdateState.Downloading) {
-                                Text(if (updateState == MainViewModel.UpdateState.Downloading) "Изтеглям…" else "Обнови")
+                                Text(if (updateState == MainViewModel.UpdateState.Downloading) tr("Изтеглям…") else tr("Обнови"))
                             }
                         }
                     }
@@ -225,74 +227,77 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
 
             // ------------------------------------------------ pictures
             item {
-                Group("Снимки") {
-                    LinkRow(Icons.Outlined.Image, Tint.BLUE, "Какви снимки", photoModeLabel(s.photoMode), first = true) { sheet = Sheet.PHOTOS }
+                Group(tr("Снимки")) {
+                    LinkRow(Icons.Outlined.Image, Tint.BLUE, tr("Какви снимки"), photoModeLabel(s.photoMode), first = true) { sheet = Sheet.PHOTOS }
                     LinkRow(
-                        Icons.Outlined.AddPhotoAlternate, Tint.BLUE, "Моите снимки от телефона",
-                        if (st.myPhotos.isEmpty()) "Още няма – добави от галерията" else "${st.myPhotos.size} снимки",
+                        Icons.Outlined.AddPhotoAlternate, Tint.BLUE, tr("Моите снимки от телефона"),
+                        if (st.myPhotos.isEmpty()) tr("Още няма – добави от галерията") else tr("{0} снимки", st.myPhotos.size),
                         onClick = onOpenMyPhotos,
                     )
                     val taste = remember(st.favorites.size, st.blocked.size, s.learnTaste) { if (s.learnTaste) vm.tasteSummary() else "" }
                     ToggleRow(
-                        Icons.Outlined.FavoriteBorder, Tint.PINK, "Учи вкуса ми",
+                        Icons.Outlined.FavoriteBorder, Tint.PINK, tr("Учи вкуса ми"),
                         when {
-                            !s.learnTaste -> "Всички източници идват поред"
+                            !s.learnTaste -> tr("Всички източници идват поред")
                             taste.isNotBlank() -> taste
-                            else -> "Харесаните (♥) снимки ще идват по-често"
+                            else -> tr("Харесаните (♥) снимки ще идват по-често")
                         },
                         s.learnTaste,
                     ) { v -> update { it.copy(learnTaste = v) } }
                     ToggleRow(
-                        Icons.Outlined.Palette, Tint.PINK, "Пауза за изкуство",
-                        "На всеки 20 разгледани снимки – известна картина и историята ѝ",
+                        Icons.Outlined.Palette, Tint.PINK, tr("Пауза за изкуство"),
+                        tr("На всеки 20 разгледани снимки – известна картина и историята ѝ"),
                         s.artBreaks,
                     ) { v -> update { it.copy(artBreaks = v) } }
-                    ToggleRow(
-                        Icons.Outlined.Translate, Tint.BLUE, "Описания на български",
-                        "Заглавията и историите се превеждат на телефона · еднократно ~30 MB при Wi-Fi",
-                        s.translateStories,
-                    ) { v -> update { it.copy(translateStories = v) } }
+                    // Translating the stories is only for Bulgarian (in English they are original).
+                    if (bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.BG) {
+                        ToggleRow(
+                            Icons.Outlined.Translate, Tint.BLUE, tr("Описания на български"),
+                            tr("Заглавията и историите се превеждат на телефона · еднократно ~30 MB при Wi-Fi"),
+                            s.translateStories,
+                        ) { v -> update { it.copy(translateStories = v) } }
+                    }
                 }
             }
 
             // ------------------------------------------------ change
             item {
-                Group("Смяна") {
-                    LinkRow(Icons.Outlined.Schedule, Tint.ORANGE, "Колко често", frequencyLabel(s), first = true) { sheet = Sheet.FREQUENCY }
-                    LinkRow(Icons.Outlined.Smartphone, Tint.ORANGE, "Къде да се слага", targetLabel(s)) { sheet = Sheet.TARGET }
+                Group(tr("Смяна")) {
+                    LinkRow(Icons.Outlined.Schedule, Tint.ORANGE, tr("Колко често"), frequencyLabel(s), first = true) { sheet = Sheet.FREQUENCY }
+                    LinkRow(Icons.Outlined.Smartphone, Tint.ORANGE, tr("Къде да се слага"), targetLabel(s)) { sheet = Sheet.TARGET }
                     LinkRow(
-                        Icons.Outlined.WbSunny, Tint.ORANGE, "Според часа, сезона и времето",
+                        Icons.Outlined.WbSunny, Tint.ORANGE, tr("Според часа, сезона и времето"),
                         listOfNotNull(
-                            "според часа".takeIf { s.timeRules },
-                            "сезона".takeIf { s.seasonRules },
-                            "времето".takeIf { s.weatherRules },
-                        ).joinToString(", ").replaceFirstChar { it.uppercase() }.ifBlank { "Изключено · по избор" },
+                            tr("според часа").takeIf { s.timeRules },
+                            tr("сезона").takeIf { s.seasonRules },
+                            tr("времето").takeIf { s.weatherRules },
+                        ).joinToString(", ").replaceFirstChar { it.uppercase() }.ifBlank { tr("Изключено · по избор") },
                     ) { sheet = Sheet.RULES }
                     ToggleRow(
-                        Icons.Outlined.LockOpen, Tint.ORANGE, "Нова снимка при всяко отключване",
-                        "Друга снимка всеки път, когато събудиш телефона", s.changeOnUnlock,
-                        note = "По избор · малко повече батерия",
+                        Icons.Outlined.LockOpen, Tint.ORANGE, tr("Нова снимка при всяко отключване"),
+                        tr("Друга снимка всеки път, когато събудиш телефона"), s.changeOnUnlock,
+                        note = tr("По избор · малко повече батерия"),
                     ) { v -> vm.setLiveOption({ it.copy(changeOnUnlock = v) }, askLive) }
                     ToggleRow(
-                        Icons.Outlined.TouchApp, Tint.ORANGE, "Двойно докосване на началния екран",
-                        "Докосни два пъти празно място – идва следващата снимка", s.doubleTapNext,
-                        note = "По избор",
+                        Icons.Outlined.TouchApp, Tint.ORANGE, tr("Двойно докосване на началния екран"),
+                        tr("Докосни два пъти празно място – идва следващата снимка"), s.doubleTapNext,
+                        note = tr("По избор"),
                     ) { v -> vm.setLiveOption({ it.copy(doubleTapNext = v) }, askLive) }
                     if (s.changeOnUnlock || s.doubleTapNext) {
                         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             if (s.target == WallpaperTarget.LOCK) {
-                                Hint("Работи, когато тапетът е и на началния екран – в „Къде да се слага“ избери „Начален екран“ или „И двата“.")
+                                Hint(tr("Работи, когато тапетът е и на началния екран – в „Къде да се слага“ избери „Начален екран“ или „И двата“."))
                             } else {
                                 StatusRow(
                                     ok = liveActive,
-                                    title = if (liveActive) "Готово – работи" else "Остава една стъпка",
-                                    text = if (liveActive) "Снимките се вземат от вече изтеглените – смяната е мигновена и не хаби интернет."
-                                    else "„Включи“ → „Задай тапет“ → „Начален екран“. Само веднъж.",
-                                    action = if (liveActive) null else ("Включи" to openPanorama),
+                                    title = if (liveActive) tr("Готово – работи") else tr("Остава една стъпка"),
+                                    text = if (liveActive) tr("Снимките се вземат от вече изтеглените – смяната е мигновена и не хаби интернет.")
+                                    else tr("„Включи“ → „Задай тапет“ → „Начален екран“. Само веднъж."),
+                                    action = if (liveActive) null else (tr("Включи") to openPanorama),
                                 )
                             }
                             if (s.changeOnUnlock && android.os.Build.MANUFACTURER.equals("samsung", ignoreCase = true)) {
-                                Hint("На Samsung има и вграден „Динамичен заключен екран“ – ползвай само едното от двете.")
+                                Hint(tr("На Samsung има и вграден „Динамичен заключен екран“ – ползвай само едното от двете."))
                             }
                         }
                     }
@@ -301,44 +306,44 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
 
             // ------------------------------------------------ home screen: panorama and effects
             item {
-                Group("Начален екран") {
-                    ToggleRow(Icons.Outlined.Panorama, Tint.PURPLE, "Панорама", "Снимката продължава между екраните", s.panorama, first = true) { v ->
+                Group(tr("Начален екран")) {
+                    ToggleRow(Icons.Outlined.Panorama, Tint.PURPLE, tr("Панорама"), tr("Снимката продължава между екраните"), s.panorama, first = true) { v ->
                         vm.setPanorama(v, askLive)
                     }
                     if (s.panorama) {
                         ChipLine {
-                            listOf(1.5f to "1,5 екрана", 2f to "2 екрана", 3f to "3 екрана").forEach { (w, label) ->
+                            listOf(1.5f to tr("1,5 екрана"), 2f to tr("2 екрана"), 3f to tr("3 екрана")).forEach { (w, label) ->
                                 ChoiceChip(selected = s.panoramaScreens == w, enabled = !busy, onClick = { update { it.copy(panoramaScreens = w) } }, label = { Text(label) })
                             }
                         }
                     }
-                    ToggleRow(Icons.Outlined.ScreenRotation, Tint.PURPLE, "Движение при накланяне", "Снимката се отмества, когато наклониш телефона", s.tilt) { v ->
+                    ToggleRow(Icons.Outlined.ScreenRotation, Tint.PURPLE, tr("Движение при накланяне"), tr("Снимката се отмества, когато наклониш телефона"), s.tilt) { v ->
                         vm.setLiveOption({ it.copy(tilt = v) }, askLive)
                     }
                     ToggleRow(
-                        Icons.Outlined.Visibility, Tint.PURPLE, "По-четливи икони",
-                        "Леко затъмнен тапет, за да се виждат иконите", s.readableIcons != ReadableMode.OFF,
+                        Icons.Outlined.Visibility, Tint.PURPLE, tr("По-четливи икони"),
+                        tr("Леко затъмнен тапет, за да се виждат иконите"), s.readableIcons != ReadableMode.OFF,
                     ) { v -> vm.setLiveOption({ it.copy(readableIcons = if (v) ReadableMode.DIM else ReadableMode.OFF) }, askLive) }
                     if (s.readableIcons != ReadableMode.OFF) {
                         ChipLine {
-                            ChoiceChip(selected = s.readableIcons == ReadableMode.DIM, onClick = { update { it.copy(readableIcons = ReadableMode.DIM) } }, label = { Text("Затъмни") })
-                            ChoiceChip(selected = s.readableIcons == ReadableMode.DIM_BLUR, onClick = { update { it.copy(readableIcons = ReadableMode.DIM_BLUR) } }, label = { Text("Затъмни и размажи") })
+                            ChoiceChip(selected = s.readableIcons == ReadableMode.DIM, onClick = { update { it.copy(readableIcons = ReadableMode.DIM) } }, label = { Text(tr("Затъмни")) })
+                            ChoiceChip(selected = s.readableIcons == ReadableMode.DIM_BLUR, onClick = { update { it.copy(readableIcons = ReadableMode.DIM_BLUR) } }, label = { Text(tr("Затъмни и размажи")) })
                         }
                     }
-                    ToggleRow(Icons.Outlined.DarkMode, Tint.PURPLE, "Вечер по-тъмно", "От 19:30 до 07:00, за да не блести", s.eveningDim) { v ->
+                    ToggleRow(Icons.Outlined.DarkMode, Tint.PURPLE, tr("Вечер по-тъмно"), tr("От 19:30 до 07:00, за да не блести"), s.eveningDim) { v ->
                         vm.setLiveOption({ it.copy(eveningDim = v) }, askLive)
                     }
                     if (s.panorama || s.tilt || s.readableIcons != ReadableMode.OFF || s.eveningDim) {
                         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 14.dp)) {
                             if (s.target == WallpaperTarget.LOCK) {
-                                Hint("Ефектите са за началния екран – в „Къде да се слага“ избери „Начален екран“ или „И двата“.")
+                                Hint(tr("Ефектите са за началния екран – в „Къде да се слага“ избери „Начален екран“ или „И двата“."))
                             } else {
                                 StatusRow(
                                     ok = liveActive,
-                                    title = if (liveActive) "Ефектите работят" else "Остава една стъпка",
-                                    text = if (liveActive) "Тапетът се рисува от приложението."
-                                    else "„Включи“ → „Задай тапет“ → „Начален екран“. Само веднъж.",
-                                    action = if (liveActive) null else ("Включи" to openPanorama),
+                                    title = if (liveActive) tr("Ефектите работят") else tr("Остава една стъпка"),
+                                    text = if (liveActive) tr("Тапетът се рисува от приложението.")
+                                    else tr("„Включи“ → „Задай тапет“ → „Начален екран“. Само веднъж."),
+                                    action = if (liveActive) null else (tr("Включи") to openPanorama),
                                 )
                             }
                         }
@@ -348,37 +353,40 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
 
             // ------------------------------------------------ sources
             item {
-                Group("Източници") {
+                Group(tr("Източници")) {
                     val names = SourceRegistry.all.filter { it.id in s.enabledSources && it.isConfigured(s) }.map { it.displayName }
-                    LinkRow(Icons.Outlined.Public, Tint.TEAL, "Източници на снимки", names.joinToString(", ").ifBlank { "Няма включени" }, first = true) { sheet = Sheet.SOURCES }
+                    LinkRow(Icons.Outlined.Public, Tint.TEAL, tr("Източници на снимки"), names.joinToString(", ").ifBlank { tr("Няма включени") }, first = true) { sheet = Sheet.SOURCES }
                     LinkRow(
-                        Icons.AutoMirrored.Outlined.Label, Tint.TEAL, "Категории",
-                        if (s.enabledCategories.size == Category.entries.size) "Всички ${Category.entries.size}"
+                        Icons.AutoMirrored.Outlined.Label, Tint.TEAL, tr("Категории"),
+                        if (s.enabledCategories.size == Category.entries.size) tr("Всички {0}", Category.entries.size)
                         else s.enabledCategories.joinToString(", ") { it.label },
                     ) { sheet = Sheet.CATEGORIES }
                     LinkRow(
-                        Icons.Outlined.Wifi, Tint.TEAL, "Изтегляне",
-                        (if (s.wifiOnly) "Само Wi-Fi" else "Wi-Fi и мобилни данни") + if (dataSaver && !s.wifiOnly) " · ⚠ пестене на данни" else "",
+                        Icons.Outlined.Wifi, Tint.TEAL, tr("Изтегляне"),
+                        (if (s.wifiOnly) tr("Само Wi-Fi") else tr("Wi-Fi и мобилни данни")) + if (dataSaver && !s.wifiOnly) tr(" · ⚠ пестене на данни") else "",
                     ) { sheet = Sheet.NETWORK }
                 }
             }
 
             // ------------------------------------------------ system
             item {
-                Group("Система") {
+                Group(tr("Система")) {
                     LinkRow(
-                        Icons.Outlined.Shield, if (problems == 0) Tint.GREEN else Tint.ORANGE, "Надеждна работа на заден план",
-                        if (problems == 0) "✓ Всичко е наред" else "⚠ $problems ${if (problems == 1) "нещо за настройка" else "неща за настройка"}",
+                        Icons.Outlined.Shield, if (problems == 0) Tint.GREEN else Tint.ORANGE, tr("Надеждна работа на заден план"),
+                        if (problems == 0) tr("✓ Всичко е наред") else "⚠ $problems ${if (problems == 1) tr("нещо за настройка") else tr("неща за настройка")}",
                         first = true,
                     ) { sheet = Sheet.RELIABILITY }
                     ToggleRow(
-                        Icons.Outlined.AutoAwesome, Tint.BLUE, "Поздрав при отваряне",
-                        "Снимката се появява плавно с кратка фраза", s.openGreeting,
+                        Icons.Outlined.AutoAwesome, Tint.BLUE, tr("Поздрав при отваряне"),
+                        tr("Снимката се появява плавно с кратка фраза"), s.openGreeting,
                     ) { v -> update { it.copy(openGreeting = v) } }
-                    LinkRow(Icons.Outlined.Storage, Tint.GRAY, "Памет", "${Format.megabytes(cache)} · готови снимки: ${st.queue.size}") { sheet = Sheet.MEMORY }
                     LinkRow(
-                        Icons.Outlined.Info, Tint.GRAY, "За приложението",
-                        "Версия ${BuildConfig.VERSION_NAME}" + (newVersion?.let { " · има нова ${it.version}" } ?: ""),
+                        Icons.Outlined.Language, Tint.BLUE, tr("Език") + " · Language", bg.dnevnitapet.i18n.I18n.language.nativeName,
+                    ) { sheet = Sheet.LANGUAGE }
+                    LinkRow(Icons.Outlined.Storage, Tint.GRAY, tr("Памет"), tr("{0} · готови снимки: {1}", Format.megabytes(cache), st.queue.size)) { sheet = Sheet.MEMORY }
+                    LinkRow(
+                        Icons.Outlined.Info, Tint.GRAY, tr("За приложението"),
+                        tr("Версия {0}", BuildConfig.VERSION_NAME) + (newVersion?.let { tr(" · има нова {0}", it.version) } ?: ""),
                     ) { sheet = Sheet.ABOUT }
                 }
             }
@@ -388,16 +396,17 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     sheet?.let { which ->
         SettingsSheet(
             title = when (which) {
-                Sheet.PHOTOS -> "Какви снимки"
-                Sheet.FREQUENCY -> "Колко често"
-                Sheet.TARGET -> "Къде да се слага"
-                Sheet.RULES -> "Според часа, сезона и времето"
-                Sheet.SOURCES -> "Източници на снимки"
-                Sheet.CATEGORIES -> "Категории"
-                Sheet.NETWORK -> "Изтегляне"
-                Sheet.RELIABILITY -> "Надеждна работа на заден план"
-                Sheet.MEMORY -> "Памет"
-                Sheet.ABOUT -> "За приложението"
+                Sheet.PHOTOS -> tr("Какви снимки")
+                Sheet.FREQUENCY -> tr("Колко често")
+                Sheet.TARGET -> tr("Къде да се слага")
+                Sheet.RULES -> tr("Според часа, сезона и времето")
+                Sheet.SOURCES -> tr("Източници на снимки")
+                Sheet.CATEGORIES -> tr("Категории")
+                Sheet.NETWORK -> tr("Изтегляне")
+                Sheet.RELIABILITY -> tr("Надеждна работа на заден план")
+                Sheet.MEMORY -> tr("Памет")
+                Sheet.ABOUT -> tr("За приложението")
+                Sheet.LANGUAGE -> tr("Език") + " · Language"
             },
             onDismiss = { sheet = null },
         ) {
@@ -408,49 +417,49 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         OutlinedButton(onClick = {
                             sheet = null
                             onOpenMyPhotos()
-                        }) { Text("Моите снимки от телефона (${st.myPhotos.size})") }
+                        }) { Text(tr("Моите снимки от телефона ({0})", st.myPhotos.size)) }
                     }
                 }
                 Sheet.FREQUENCY -> {
-                    RadioRow("Веднъж дневно", s.frequency == FrequencyMode.DAILY) { update { it.copy(frequency = FrequencyMode.DAILY) } }
+                    RadioRow(tr("Веднъж дневно"), s.frequency == FrequencyMode.DAILY) { update { it.copy(frequency = FrequencyMode.DAILY) } }
                     if (s.frequency == FrequencyMode.DAILY) {
                         Row(Modifier.padding(start = 48.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("В ", style = MaterialTheme.typography.bodyLarge)
+                            Text(tr("В "), style = MaterialTheme.typography.bodyLarge)
                             OutlinedButton(onClick = { showTime = true }) { Text(Format.minuteOfDay(s.dailyMinuteOfDay)) }
-                            Text("  часа", style = MaterialTheme.typography.bodyLarge)
+                            Text(tr("  часа"), style = MaterialTheme.typography.bodyLarge)
                         }
-                        Text("На всеки:", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 48.dp))
+                        Text(tr("На всеки:"), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 48.dp))
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(Modifier.padding(start = 48.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(1, 2, 3, 7, 14).forEach { d ->
-                                ChoiceChip(selected = s.everyDays == d, onClick = { update { it.copy(everyDays = d) } }, label = { Text(if (d == 1) "1 ден" else "$d дни") })
+                                ChoiceChip(selected = s.everyDays == d, onClick = { update { it.copy(everyDays = d) } }, label = { Text(if (d == 1) tr("1 ден") else tr("{0} дни", d)) })
                             }
                         }
                     }
-                    RadioRow("На всеки няколко часа", s.frequency == FrequencyMode.INTERVAL) { update { it.copy(frequency = FrequencyMode.INTERVAL) } }
+                    RadioRow(tr("На всеки няколко часа"), s.frequency == FrequencyMode.INTERVAL) { update { it.copy(frequency = FrequencyMode.INTERVAL) } }
                     if (s.frequency == FrequencyMode.INTERVAL) {
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(Modifier.padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(1, 2, 3, 6, 12).forEach { h ->
-                                ChoiceChip(selected = s.intervalHours == h, onClick = { update { it.copy(intervalHours = h) } }, label = { Text(if (h == 1) "1 час" else "$h часа") })
+                                ChoiceChip(selected = s.intervalHours == h, onClick = { update { it.copy(intervalHours = h) } }, label = { Text(if (h == 1) tr("1 час") else tr("{0} часа", h)) })
                             }
                         }
                     }
-                    Hint("„Задръж“ на главния екран (или ключът „Автоматична смяна“ горе) спира смяната, докато не я пуснеш пак.")
+                    Hint(tr("„Задръж“ на главния екран (или ключът „Автоматична смяна“ горе) спира смяната, докато не я пуснеш пак."))
                 }
                 Sheet.TARGET -> {
-                    RadioRow("Начален екран", s.target == WallpaperTarget.HOME) { update { it.copy(target = WallpaperTarget.HOME) } }
-                    RadioRow("Заключен екран", s.target == WallpaperTarget.LOCK) { update { it.copy(target = WallpaperTarget.LOCK) } }
-                    RadioRow("И двата", s.target == WallpaperTarget.BOTH) { update { it.copy(target = WallpaperTarget.BOTH) } }
+                    RadioRow(tr("Начален екран"), s.target == WallpaperTarget.HOME) { update { it.copy(target = WallpaperTarget.HOME) } }
+                    RadioRow(tr("Заключен екран"), s.target == WallpaperTarget.LOCK) { update { it.copy(target = WallpaperTarget.LOCK) } }
+                    RadioRow(tr("И двата"), s.target == WallpaperTarget.BOTH) { update { it.copy(target = WallpaperTarget.BOTH) } }
                     if (s.target == WallpaperTarget.BOTH) {
                         SwitchRow(
-                            "Различни снимки на двата екрана",
-                            "При всяка смяна заключеният екран получава друга снимка",
+                            tr("Различни снимки на двата екрана"),
+                            tr("При всяка смяна заключеният екран получава друга снимка"),
                             s.lockDifferent,
                         ) { v -> update { it.copy(lockDifferent = v) } }
                     }
                     if (s.target != WallpaperTarget.HOME) {
-                        Hint("Ако телефонът ти сам сменя заключения екран (напр. „Динамичен заключен екран“ на Samsung или „Карусел“ на Xiaomi), той ще бъде заменен от тази снимка.")
+                        Hint(tr("Ако телефонът ти сам сменя заключения екран (напр. „Динамичен заключен екран“ на Samsung или „Карусел“ на Xiaomi), той ще бъде заменен от тази снимка."))
                     }
                 }
                 Sheet.SOURCES -> {
@@ -487,23 +496,23 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     }
                     Column(Modifier.padding(horizontal = 16.dp)) {
                         Hint(
-                            "Bing, Spotlight и Wikimedia не посочват категория – тя се разпознава по описанието на " +
-                                "снимката и не е 100% точна. Снимки без разпозната категория се показват винаги. " +
-                                "NASA е винаги „Космос“; Unsplash и Pexels търсят точно по категория.",
+                            tr("Bing, Spotlight и Wikimedia не посочват категория – тя се разпознава по описанието на ") +
+                                tr("снимката и не е 100% точна. Снимки без разпозната категория се показват винаги. ") +
+                                tr("NASA е винаги „Космос“; Unsplash и Pexels търсят точно по категория."),
                         )
                     }
                 }
                 Sheet.NETWORK -> {
-                    RadioRow("Wi-Fi и мобилни данни", !s.wifiOnly) { update { it.copy(wifiOnly = false) } }
-                    RadioRow("Само Wi-Fi", s.wifiOnly) { update { it.copy(wifiOnly = true) } }
+                    RadioRow(tr("Wi-Fi и мобилни данни"), !s.wifiOnly) { update { it.copy(wifiOnly = false) } }
+                    RadioRow(tr("Само Wi-Fi"), s.wifiOnly) { update { it.copy(wifiOnly = true) } }
                     Column(Modifier.padding(horizontal = 16.dp)) {
-                        Hint("Изтеглят се по 1–2 MB на снимка. Готовите снимки се сменят и без интернет.")
+                        Hint(tr("Изтеглят се по 1–2 MB на снимка. Готовите снимки се сменят и без интернет."))
                         if (dataSaver && !s.wifiOnly) {
                             StatusRow(
                                 ok = false,
-                                title = "„Пестене на данни“ е включено",
-                                text = "Телефонът спира мобилните данни за приложенията на заден план. Разреши ги за Дневен тапет.",
-                                action = "Разреши" to { Power.openDataSaverSettings(context) },
+                                title = tr("„Пестене на данни“ е включено"),
+                                text = tr("Телефонът спира мобилните данни за приложенията на заден план. Разреши ги за Дневен тапет."),
+                                action = tr("Разреши") to { Power.openDataSaverSettings(context) },
                             )
                         }
                     }
@@ -512,23 +521,23 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         StatusRow(
                             ok = unrestricted,
-                            title = if (unrestricted) "Батерия: без ограничения" else "Батерия: оптимизирана",
-                            text = if (unrestricted) "Системата няма да спира смяната." else "Телефонът може да спре приложението и да пропусне смяната.",
-                            action = if (unrestricted) null else ("Разреши" to { Power.requestUnrestricted(context) }),
+                            title = if (unrestricted) tr("Батерия: без ограничения") else tr("Батерия: оптимизирана"),
+                            text = if (unrestricted) tr("Системата няма да спира смяната.") else tr("Телефонът може да спре приложението и да пропусне смяната."),
+                            action = if (unrestricted) null else (tr("Разреши") to { Power.requestUnrestricted(context) }),
                         )
                         StatusRow(
                             ok = exact,
-                            title = if (exact) "Точни аларми: разрешени" else "Точни аларми: забранени",
-                            text = if (exact) "Смяната става точно в избрания час." else "Смяната може да закъснее (наваксва при първа възможност).",
-                            action = if (exact) null else ("Разреши" to { Power.openExactAlarmSettings(context) }),
+                            title = if (exact) tr("Точни аларми: разрешени") else tr("Точни аларми: забранени"),
+                            text = if (exact) tr("Смяната става точно в избрания час.") else tr("Смяната може да закъснее (наваксва при първа възможност)."),
+                            action = if (exact) null else (tr("Разреши") to { Power.openExactAlarmSettings(context) }),
                         )
                         if (unusedPause != null) {
                             StatusRow(
                                 ok = unusedPause == false,
-                                title = if (unusedPause == false) "Пауза при неизползване: изключена" else "Пауза при неизползване: включена",
-                                text = if (unusedPause == false) "Android няма да спре приложението, ако дълго не го отваряш."
-                                else "Ако не отваряш приложението няколко месеца, Android може да го спре. Изключи „Пауза на активността, ако не се използва“.",
-                                action = if (unusedPause == false) null else ("Изключи" to { Power.openUnusedAppSettings(context) }),
+                                title = if (unusedPause == false) tr("Пауза при неизползване: изключена") else tr("Пауза при неизползване: включена"),
+                                text = if (unusedPause == false) tr("Android няма да спре приложението, ако дълго не го отваряш.")
+                                else tr("Ако не отваряш приложението няколко месеца, Android може да го спре. Изключи „Пауза на активността, ако не се използва“."),
+                                action = if (unusedPause == false) null else (tr("Изключи") to { Power.openUnusedAppSettings(context) }),
                             )
                         }
                         VendorSteps(
@@ -538,40 +547,49 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                             onMore = { Power.openUrl(context, "https://dontkillmyapp.com/") },
                         )
                         Text(
-                            "Последна смяна: ${Format.moment(st.lastChangeAt)}\n" +
-                                "Последна автоматична: ${Format.moment(st.lastAutoChangeAt)}\n" +
-                                "Следваща планирана: ${next?.let(Format::moment) ?: "—"}",
+                            tr("Последна смяна: {0}\n", Format.moment(st.lastChangeAt)) +
+                                tr("Последна автоматична: {0}\n", Format.moment(st.lastAutoChangeAt)) +
+                                tr("Следваща планирана: {0}", next?.let(Format::moment) ?: "—"),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        TextButton(onClick = { showLog = true }) { Text("Дневник на събитията") }
+                        TextButton(onClick = { showLog = true }) { Text(tr("Дневник на събитията")) }
                     }
                 }
                 Sheet.RULES -> RulesSheetContent(vm, s, update)
+                Sheet.LANGUAGE -> {
+                    bg.dnevnitapet.i18n.AppLanguage.entries.forEach { lang ->
+                        RadioRow(lang.nativeName, lang == bg.dnevnitapet.i18n.I18n.language) {
+                            sheet = null
+                            context.findActivityForLanguage()?.let { vm.setLanguage(lang, it) }
+                        }
+                    }
+                    Hint(tr("Приложението се рестартира, за да смени езика."))
+                }
                 Sheet.MEMORY -> {
                     Column(Modifier.padding(horizontal = 16.dp)) {
                         Text(
-                            "Заети: ${Format.megabytes(cache)} (до 5 готови снимки, 30 в историята и любимите).\n" +
-                                "Готови снимки: ${st.queue.size} · в историята: ${st.history.size} · любими: ${st.favorites.size}",
+                            tr("Заети: {0} (до 5 готови снимки, 30 в историята и любимите).\n", Format.megabytes(cache)) +
+                                tr("Готови снимки: {0} · в историята: {1} · любими: {2}", st.queue.size, st.history.size, st.favorites.size),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                            OutlinedButton(onClick = vm::prepareNow) { Text("Изтегли нови сега") }
-                            TextButton(onClick = vm::clearQueue) { Text("Изчисти готовите") }
+                            OutlinedButton(onClick = vm::prepareNow) { Text(tr("Изтегли нови сега")) }
+                            TextButton(onClick = vm::clearQueue) { Text(tr("Изчисти готовите")) }
                         }
                     }
                 }
                 Sheet.ABOUT -> {
                     Column(Modifier.padding(horizontal = 16.dp)) {
-                        Text("Дневен тапет ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleSmall)
+                        Text(tr("Дневен тапет {0}", BuildConfig.VERSION_NAME), style = MaterialTheme.typography.titleSmall)
                         Hint(
-                            "Без реклами, акаунти и проследяване. Приложението се свързва само с източниците на снимки " +
-                                "и с GitHub, за да провери за нова версия. Снимките са собственост на авторите си и се ползват само като личен тапет.",
+                            tr("Без реклами, акаунти и проследяване. Приложението се свързва само с източниците на снимки ") +
+                                tr("и с GitHub, за да провери за нова версия. Снимките са собственост на авторите си и се ползват само като личен тапет."),
                         )
                     }
                     SwitchRow(
-                        "Проверявай за нова версия",
-                        "При всяко отваряне – ако има, приложението пита дали да се обнови",
+                        tr("Проверявай за нова версия"),
+                        tr("При всяко отваряне – ако има, приложението пита дали да се обнови"),
                         s.checkUpdates,
                     ) { v -> update { it.copy(checkUpdates = v) } }
                     @OptIn(ExperimentalLayoutApi::class)
@@ -579,12 +597,12 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         val r = newVersion
                         if (r != null) {
                             Button(onClick = vm::installUpdate, enabled = updateState != MainViewModel.UpdateState.Downloading) {
-                                Text(if (updateState == MainViewModel.UpdateState.Downloading) "Изтеглям…" else "Обнови до ${r.version}")
+                                Text(if (updateState == MainViewModel.UpdateState.Downloading) tr("Изтеглям…") else tr("Обнови до {0}", r.version))
                             }
                         } else {
-                            OutlinedButton(onClick = { vm.checkForUpdate(manual = true) }) { Text("Провери сега") }
+                            OutlinedButton(onClick = { vm.checkForUpdate(manual = true) }) { Text(tr("Провери сега")) }
                         }
-                        TextButton(onClick = { showLog = true }) { Text("Дневник") }
+                        TextButton(onClick = { showLog = true }) { Text(tr("Дневник")) }
                     }
                 }
             }
@@ -595,26 +613,26 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
         val state = rememberTimePickerState(s.dailyMinuteOfDay / 60, s.dailyMinuteOfDay % 60, is24Hour = true)
         AlertDialog(
             onDismissRequest = { showTime = false },
-            title = { Text("Час на смяната") },
+            title = { Text(tr("Час на смяната")) },
             text = { TimePicker(state) },
             confirmButton = {
                 TextButton(onClick = {
                     update { it.copy(dailyMinuteOfDay = state.hour * 60 + state.minute) }
                     showTime = false
-                }) { Text("Готово") }
+                }) { Text(tr("Готово")) }
             },
-            dismissButton = { TextButton(onClick = { showTime = false }) { Text("Отказ") } },
+            dismissButton = { TextButton(onClick = { showTime = false }) { Text(tr("Отказ")) } },
         )
     }
 
     if (showLog) {
         AlertDialog(
             onDismissRequest = { showLog = false },
-            title = { Text("Дневник") },
+            title = { Text(tr("Дневник")) },
             text = {
                 LazyColumn(Modifier.height(420.dp)) {
                     val entries = st.log.asReversed()
-                    if (entries.isEmpty()) item { Text("Още няма събития.") }
+                    if (entries.isEmpty()) item { Text(tr("Още няма събития.")) }
                     items(entries.size) { i ->
                         val e = entries[i]
                         Column(Modifier.padding(vertical = 4.dp)) {
@@ -624,27 +642,27 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showLog = false }) { Text("Затвори") } },
+            confirmButton = { TextButton(onClick = { showLog = false }) { Text(tr("Затвори")) } },
         )
     }
 }
 
 private fun photoModeLabel(mode: PhotoMode) = when (mode) {
-    PhotoMode.ONLINE -> "Снимки от интернет"
-    PhotoMode.MINE -> "Само моите снимки"
-    PhotoMode.MIXED -> "Смесено: мои и от интернет"
+    PhotoMode.ONLINE -> tr("Снимки от интернет")
+    PhotoMode.MINE -> tr("Само моите снимки")
+    PhotoMode.MIXED -> tr("Смесено: мои и от интернет")
 }
 
 private fun frequencyLabel(s: Settings): String = when (s.frequency) {
     FrequencyMode.DAILY ->
-        (if (s.everyDays == 1) "Всеки ден" else "На всеки ${s.everyDays} дни") + " в " + Format.minuteOfDay(s.dailyMinuteOfDay)
-    FrequencyMode.INTERVAL -> if (s.intervalHours == 1) "Всеки час" else "На всеки ${s.intervalHours} часа"
+        (if (s.everyDays == 1) tr("Всеки ден") else tr("На всеки {0} дни", s.everyDays)) + tr(" в ") + Format.minuteOfDay(s.dailyMinuteOfDay)
+    FrequencyMode.INTERVAL -> if (s.intervalHours == 1) tr("Всеки час") else tr("На всеки {0} часа", s.intervalHours)
 }
 
 private fun targetLabel(s: Settings): String = when (s.target) {
-    WallpaperTarget.HOME -> "Начален екран"
-    WallpaperTarget.LOCK -> "Заключен екран"
-    WallpaperTarget.BOTH -> if (s.lockDifferent) "И двата · различни снимки" else "Начален и заключен екран"
+    WallpaperTarget.HOME -> tr("Начален екран")
+    WallpaperTarget.LOCK -> tr("Заключен екран")
+    WallpaperTarget.BOTH -> if (s.lockDifferent) tr("И двата · различни снимки") else tr("Начален и заключен екран")
 }
 
 /** Colour of a row's icon square. */
@@ -832,12 +850,12 @@ private fun RadioRow(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun SourceRow(name: String, enabled: Boolean, configured: Boolean, status: SourceStatus?, onChange: (Boolean) -> Unit) {
     val statusText = when {
-        !configured -> "Нужен е безплатен ключ (виж по-долу)"
-        !enabled -> "Изключен"
-        status == null || (status.lastSuccessAt == 0L && status.lastErrorAt == 0L) -> "Още не е питан"
+        !configured -> tr("Нужен е безплатен ключ (виж по-долу)")
+        !enabled -> tr("Изключен")
+        status == null || (status.lastSuccessAt == 0L && status.lastErrorAt == 0L) -> tr("Още не е питан")
         status.lastError.isNotBlank() && status.lastErrorAt >= status.lastSuccessAt ->
-            "⚠ Грешка (${Format.moment(status.lastErrorAt)}): ${status.lastError}"
-        else -> "✓ Работи · ${Format.moment(status.lastSuccessAt)}"
+            tr("⚠ Грешка ({0}): {1}", Format.moment(status.lastErrorAt), status.lastError)
+        else -> tr("✓ Работи · {0}", Format.moment(status.lastSuccessAt))
     }
     Row(
         Modifier.fillMaxWidth().clickable(enabled = configured) { onChange(!enabled) }.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -871,10 +889,10 @@ private fun KeyField(label: String, value: String, helpUrl: String, onSave: (Str
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(helpUrl))) } }) {
-                Text("Как да взема ключ")
+                Text(tr("Как да взема ключ"))
             }
             Spacer(Modifier.weight(1f))
-            if (text != value) TextButton(onClick = { onSave(text) }) { Text("Запази") }
+            if (text != value) TextButton(onClick = { onSave(text) }) { Text(tr("Запази")) }
         }
     }
 }
@@ -903,27 +921,27 @@ private fun VendorSteps(onOpenBattery: () -> Unit, onOpenAutoStart: () -> Unit, 
     var showAll by remember { mutableStateOf(false) }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("За твоя телефон: ${vendor.label}", style = MaterialTheme.typography.titleSmall)
+            Text(tr("За твоя телефон: {0}", vendor.label), style = MaterialTheme.typography.titleSmall)
             Text(Power.steps(vendor), style = MaterialTheme.typography.bodySmall)
             Text(
-                "Не натискай „Принудително спиране“ за приложението – това спира и графика до следващото му отваряне. " +
-                    "Имената на менютата се различават според марката и версията.",
+                tr("Не натискай „Принудително спиране“ за приложението – това спира и графика до следващото му отваряне. ") +
+                    tr("Имената на менютата се различават според марката и версията."),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             @OptIn(ExperimentalLayoutApi::class)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onOpenBattery) { Text("Батерия") }
-                if (Power.hasAutoStartScreen()) OutlinedButton(onClick = onOpenAutoStart) { Text("Автоматично стартиране") }
-                TextButton(onClick = onOpenApp) { Text("За приложението") }
+                OutlinedButton(onClick = onOpenBattery) { Text(tr("Батерия")) }
+                if (Power.hasAutoStartScreen()) OutlinedButton(onClick = onOpenAutoStart) { Text(tr("Автоматично стартиране")) }
+                TextButton(onClick = onOpenApp) { Text(tr("За приложението")) }
             }
-            TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) "Скрий другите марки" else "Други марки телефони") }
+            TextButton(onClick = { showAll = !showAll }) { Text(if (showAll) tr("Скрий другите марки") else tr("Други марки телефони")) }
             if (showAll) {
                 Power.Vendor.entries.filter { it != vendor }.forEach { v ->
                     Text(v.label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp))
                     Text(Power.steps(v), style = MaterialTheme.typography.bodySmall)
                 }
-                TextButton(onClick = onMore) { Text("Още съвети: dontkillmyapp.com") }
+                TextButton(onClick = onMore) { Text(tr("Още съвети: dontkillmyapp.com")) }
             }
         }
     }
@@ -946,13 +964,13 @@ private fun OptionalNote(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun RulesSheetContent(vm: MainViewModel, s: Settings, update: ((Settings) -> Settings) -> Unit) {
     Hint(
-        "Подходяща снимка идва първа при всяка смяна. Ако няма подходяща, идва обикновената. Любимите и скритите се спазват както досега.",
+        tr("Подходяща снимка идва първа при всяка смяна. Ако няма подходяща, идва обикновената. Любимите и скритите се спазват както досега."),
     )
     Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.padding(horizontal = 16.dp)) {
         Column(Modifier.fillMaxWidth()) {
             ToggleRow(
-                Icons.Outlined.Schedule, Tint.BLUE, "Снимки според часа", "Сутрин едни, вечер други",
-                s.timeRules, first = true, note = "По избор",
+                Icons.Outlined.Schedule, Tint.BLUE, tr("Снимки според часа"), tr("Сутрин едни, вечер други"),
+                s.timeRules, first = true, note = tr("По избор"),
             ) { v -> update { it.copy(timeRules = v) } }
             if (s.timeRules) {
                 bg.dnevnitapet.wallpaper.PictureRules.DayPart.entries.forEach { part ->
@@ -974,34 +992,34 @@ private fun RulesSheetContent(vm: MainViewModel, s: Settings, update: ((Settings
     Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.padding(horizontal = 16.dp)) {
         Column(Modifier.fillMaxWidth()) {
             ToggleRow(
-                Icons.Outlined.CalendarMonth, Tint.BLUE, "Според сезона", "Зиме повече сняг и планини, лете море и плажове",
-                s.seasonRules, first = true, note = "По избор",
+                Icons.Outlined.CalendarMonth, Tint.BLUE, tr("Според сезона"), tr("Зиме повече сняг и планини, лете море и плажове"),
+                s.seasonRules, first = true, note = tr("По избор"),
             ) { v -> update { it.copy(seasonRules = v) } }
             ToggleRow(
-                Icons.Outlined.Thermostat, Tint.BLUE, "Според времето навън", "Дъжд – уютни снимки, слънце – ярки, сняг – зимни",
-                s.weatherRules, note = "По избор · ползва интернет и твоя град",
+                Icons.Outlined.Thermostat, Tint.BLUE, tr("Според времето навън"), tr("Дъжд – уютни снимки, слънце – ярки, сняг – зимни"),
+                s.weatherRules, note = tr("По избор · ползва интернет и твоя град"),
             ) { v -> update { it.copy(weatherRules = v) } }
             if (s.weatherRules) {
                 var city by remember { mutableStateOf(s.weatherCity) }
                 var now by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(s.weatherCity) {
-                    if (s.weatherCity.isNotBlank()) vm.checkWeather(s.weatherCity) { now = it ?: "не намирам града" }
+                    if (s.weatherCity.isNotBlank()) vm.checkWeather(s.weatherCity) { now = it ?: tr("не намирам града") }
                 }
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
                     OutlinedTextField(
                         value = city,
                         onValueChange = { city = it.take(40) },
-                        label = { Text("Твоят град") },
-                        placeholder = { Text("напр. София") },
+                        label = { Text(tr("Твоят град")) },
+                        placeholder = { Text(tr("напр. София")) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             when {
-                                s.weatherCity.isBlank() -> "Напиши града си и натисни „Запази“."
-                                now == null -> "Проверявам времето…"
-                                else -> "Сега в ${s.weatherCity}: $now"
+                                s.weatherCity.isBlank() -> tr("Напиши града си и натисни „Запази“.")
+                                now == null -> tr("Проверявам времето…")
+                                else -> tr("Сега в {0}: {1}", s.weatherCity, now)
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1010,7 +1028,7 @@ private fun RulesSheetContent(vm: MainViewModel, s: Settings, update: ((Settings
                         TextButton(onClick = {
                             now = null
                             update { it.copy(weatherCity = city.trim()) }
-                        }, enabled = city.trim() != s.weatherCity) { Text("Запази") }
+                        }, enabled = city.trim() != s.weatherCity) { Text(tr("Запази")) }
                     }
                 }
             }
@@ -1028,9 +1046,9 @@ private fun DayPartRow(part: bg.dnevnitapet.wallpaper.PictureRules.DayPart, cate
             Text(part.hours, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Box {
-            ChoiceChip(selected = category != null, onClick = { menu = true }, label = { Text((category?.label ?: "Без значение") + " ▾", maxLines = 1, softWrap = false) })
+            ChoiceChip(selected = category != null, onClick = { menu = true }, label = { Text((category?.label ?: tr("Без значение")) + " ▾", maxLines = 1, softWrap = false) })
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("Без значение") }, onClick = {
+                DropdownMenuItem(text = { Text(tr("Без значение")) }, onClick = {
                     menu = false
                     onSelect(null)
                 })
@@ -1043,4 +1061,10 @@ private fun DayPartRow(part: bg.dnevnitapet.wallpaper.PictureRules.DayPart, cate
             }
         }
     }
+}
+
+private tailrec fun android.content.Context.findActivityForLanguage(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivityForLanguage()
+    else -> null
 }

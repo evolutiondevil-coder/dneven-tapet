@@ -11,6 +11,7 @@ import bg.dnevnitapet.sources.bool
 import bg.dnevnitapet.sources.obj
 import bg.dnevnitapet.sources.parseJson
 import bg.dnevnitapet.sources.str
+import bg.dnevnitapet.i18n.tr
 
 /**
  * Bing "picture of the day" archive (unofficial endpoint used by Bing itself).
@@ -19,7 +20,7 @@ import bg.dnevnitapet.sources.str
  */
 class BingSource : ImageSource {
     override val id = "bing"
-    override val displayName = "Bing – снимка на деня"
+    override val displayName = tr("Bing – снимка на деня")
 
     /** English markets first so that captions are in English whenever the same picture repeats. */
     private val plan = listOf(
@@ -62,7 +63,7 @@ object BingParser {
 
     fun parse(json: String): List<Candidate> {
         val images = parseJson(json).obj()?.get("images").arr()
-            ?: throw SourceFormatException("Bing: липсва списък със снимки")
+            ?: throw SourceFormatException(tr("Bing: липсва списък със снимки"))
         return images.mapNotNull { element ->
             val o = element.obj() ?: return@mapNotNull null
             val urlBase = o.str("urlbase")?.takeIf { it.contains("id=") } ?: return@mapNotNull null

@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import bg.dnevnitapet.i18n.tr
 
 data class UiMessage(val text: String, val actionLabel: String? = null, val action: (() -> Unit)? = null)
 
@@ -48,6 +49,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------------------------------------------------------- language
+
+    /**
+     * Bulgarian or English. A different language than now restarts the app, so that every text
+     * is made again in it (at the first start this happens only when the phone's language differs).
+     */
+    fun setLanguage(lang: bg.dnevnitapet.i18n.AppLanguage, activity: android.app.Activity) {
+        viewModelScope.launch {
+            val before = bg.dnevnitapet.i18n.I18n.language
+            graph.settings.update { it.copy(language = lang.code) }
+            applySystemLanguage(activity, lang)
+            if (lang != before) {
+                bg.dnevnitapet.i18n.I18n.language = lang
+                restartApp(activity)
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- rules by weather
 
     /** "Сега в София: дъжд" for the settings (null = the city or the weather was not found). */
@@ -66,7 +85,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun createAlbum(name: String, onCreated: (String) -> Unit) {
         val id = java.util.UUID.randomUUID().toString().take(8)
         viewModelScope.launch {
-            graph.library.update { it.copy(albums = it.albums + bg.dnevnitapet.model.Album(id, name.trim().ifBlank { "Албум" })) }
+            graph.library.update { it.copy(albums = it.albums + bg.dnevnitapet.model.Album(id, name.trim().ifBlank { tr("Албум") })) }
             onCreated(id)
         }
     }
@@ -155,7 +174,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     closeArt()
                     _previewKey.value = null
                     scrollTo(r.image.key)
-                    say("Картината е твоят тапет")
+                    say(tr("Картината е твоят тапет"))
                 } else {
                     report(r)
                 }
@@ -181,7 +200,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _archiveLoading.value = true
             try {
                 val added = runCatching { graph.archive.loadMore(settings.value) }.getOrDefault(0)
-                if (added == 0) say("Не успях да заредя още снимки – провери връзката")
+                if (added == 0) say(tr("Не успях да заредя още снимки – провери връзката"))
                 else graph.appScope.launch { runCatching { graph.stories.translateTitles(graph.archive.state.value.entries.map { it.candidate }.takeLast(added)) } }
             } finally {
                 _archiveLoading.value = false
@@ -199,7 +218,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (r is ChangeResult.Changed) {
                     _previewKey.value = null
                     scrollTo(r.image.key)
-                    say("Тапетът е сменен")
+                    say(tr("Тапетът е сменен"))
                     onDone()
                 } else {
                     report(r)
@@ -266,7 +285,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             scrollTo(first.key)
             setPreview(first.key)
         } else {
-            say("Изтеглям снимки от интернет…")
+            say(tr("Изтеглям снимки от интернет…"))
             loadMore()
         }
     }
@@ -305,9 +324,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val newer = r.getOrNull()
             say(
                 when {
-                    r.isFailure -> "Не успях да проверя за нова версия – няма връзка с GitHub"
-                    newer != null -> "Има нова версия ${newer.version}"
-                    else -> "Имаш най-новата версия (${bg.dnevnitapet.BuildConfig.VERSION_NAME})"
+                    r.isFailure -> tr("Не успях да проверя за нова версия – няма връзка с GitHub")
+                    newer != null -> tr("Има нова версия {0}", newer.version)
+                    else -> tr("Имаш най-новата версия ({0})", bg.dnevnitapet.BuildConfig.VERSION_NAME)
                 },
             )
             if (newer != null) _updatePromptDismissed.value = false
@@ -325,8 +344,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val updater = graph.updater
         if (!updater.canInstall()) {
             installAfterPermission = true
-            say("Разреши „Инсталиране от този източник“ и се върни – обновлението ще продължи само")
-            if (!updater.openInstallPermission()) say("Отвори Настройки → Приложения → Дневен тапет и разреши инсталиране на приложения")
+            say(tr("Разреши „Инсталиране от този източник“ и се върни – обновлението ще продължи само"))
+            if (!updater.openInstallPermission()) say(tr("Отвори Настройки → Приложения → Дневен тапет и разреши инсталиране на приложения"))
             return
         }
         viewModelScope.launch {
@@ -335,7 +354,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val file = updater.download(release)
                 updater.install(file)
             } catch (e: Exception) {
-                say("Обновлението не се изтегли: ${e.message ?: "грешка"}. Опитай пак.")
+                say(tr("Обновлението не се изтегли: {0}. Опитай пак.", e.message ?: tr("грешка")))
             } finally {
                 _updateState.value = UpdateState.Idle
             }
@@ -397,7 +416,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val version = bg.dnevnitapet.BuildConfig.VERSION_NAME
         if (bg.dnevnitapet.update.Versions.parse(version) != null && s.lastSeenVersion != version) {
             val items = runCatching {
-                getApplication<Application>().assets.open("RELEASE_NOTES.md").bufferedReader().use {
+                getApplication<Application>().assets.open(
+                    if (bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.EN) "RELEASE_NOTES.en.md" else "RELEASE_NOTES.md",
+                ).bufferedReader().use {
                     bg.dnevnitapet.update.ReleaseNotes.current(it.readText())
                 }
             }.getOrDefault(emptyList())
@@ -414,9 +435,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             greeting = Greeting.phrase(java.time.LocalTime.now().hour),
             date = Greeting.date(java.time.LocalDate.now()),
             line = when {
-                current == null -> "Днес ще ти сложа нова снимка."
-                MyPhotos.isMine(current.key) -> "Днешният ти тапет е твоя снимка."
-                else -> "Днешният ти тапет е от ${bg.dnevnitapet.sources.SourceRegistry.name(current.candidate.sourceId)}:\n${graph.stories.title(current.candidate)}"
+                current == null -> tr("Днес ще ти сложа нова снимка.")
+                MyPhotos.isMine(current.key) -> tr("Днешният ти тапет е твоя снимка.")
+                else -> tr("Днешният ти тапет е от {0}:\n{1}", bg.dnevnitapet.sources.SourceRegistry.name(current.candidate.sourceId), graph.stories.title(current.candidate))
             },
         )
     }
@@ -520,9 +541,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     say(
                         when {
-                            before.size >= MAX_BROWSE_QUEUE -> "Стигна края – избери някоя от тези или се върни назад."
-                            settings.value.wifiOnly -> "Няма повече готови снимки. Нови ще изтегля, когато има Wi-Fi."
-                            else -> "Няма повече готови снимки в момента. Опитай пак след малко."
+                            before.size >= MAX_BROWSE_QUEUE -> tr("Стигна края – избери някоя от тези или се върни назад.")
+                            settings.value.wifiOnly -> tr("Няма повече готови снимки. Нови ще изтегля, когато има Wi-Fi.")
+                            else -> tr("Няма повече готови снимки в момента. Опитай пак след малко.")
                         },
                     )
                 }
@@ -544,13 +565,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     st.queue.any { it.key == key } -> engine.chooseFromQueue(key)
                     st.myPhotos.any { it.key == key } -> engine.chooseMine(key)
                     else -> st.history.firstOrNull { it.key == key }?.let { engine.applyStored(it) }
-                        ?: ChangeResult.Failed("Снимката вече не е в списъка")
+                        ?: ChangeResult.Failed(tr("Снимката вече не е в списъка"))
                 }
                 bg.dnevnitapet.util.Diag.i("choose result: $r")
                 if (r is ChangeResult.Changed) {
                     _previewKey.value = null
                     scrollTo(r.image.key)
-                    say("Тапетът е сменен")
+                    say(tr("Тапетът е сменен"))
                 } else {
                     report(r)
                 }
@@ -583,7 +604,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _busy.value = true
             try {
                 val r = engine.applyStored(image)
-                if (r is ChangeResult.Changed) say("Тапетът е сменен") else report(r)
+                if (r is ChangeResult.Changed) say(tr("Тапетът е сменен")) else report(r)
                 scheduler.reschedule()
             } finally {
                 _busy.value = false
@@ -594,7 +615,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleFavorite(key: String) {
         viewModelScope.launch {
             val nowFavorite = engine.toggleFavorite(key)
-            say(if (nowFavorite) "Добавена в любими" else "Махната от любими")
+            say(if (nowFavorite) tr("Добавена в любими") else tr("Махната от любими"))
         }
     }
 
@@ -611,7 +632,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         ?.takeIf { it != library.value.current?.key }
                 }
                 val r = engine.block(key)
-                _messages.emit(UiMessage("Тази снимка няма да се показва повече", "Отмени") { unblock(key) })
+                _messages.emit(UiMessage(tr("Тази снимка няма да се показва повече"), tr("Отмени")) { unblock(key) })
                 if (r != null && r !is ChangeResult.Changed) report(r)
                 scheduler.enqueueRefill()
             } finally {
@@ -626,10 +647,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun save(image: StoredImage) {
         viewModelScope.launch {
-            say("Запазвам…")
+            say(tr("Запазвам…"))
             graph.gallery.save(image, settings.value)
-                .onSuccess { original -> say(if (original) "Запазена в Галерия › Дневен тапет" else "Запазена (с размера на екрана – няма връзка за оригинала)") }
-                .onFailure { say("Не успях да запазя: ${it.message}") }
+                .onSuccess { original -> say(if (original) tr("Запазена в Галерия › Дневен тапет") else tr("Запазена (с размера на екрана – няма връзка за оригинала)")) }
+                .onFailure { say(tr("Не успях да запазя: {0}", it.message)) }
         }
     }
 
@@ -674,7 +695,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             scheduler.reschedule()
             when {
                 after.liveOn && !before.liveOn -> onReady()
-                before.liveOn && !after.liveOn -> say("Ефектите са изключени – тапетът е пак обикновен")
+                before.liveOn && !after.liveOn -> say(tr("Ефектите са изключени – тапетът е пак обикновен"))
             }
         }
     }
@@ -690,7 +711,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun refitPanorama(wasOn: Boolean) {
         _busy.value = true
         try {
-            if (settings.value.panoramaOn) say("Подготвям по-широки снимки за панорамата…")
+            if (settings.value.panoramaOn) say(tr("Подготвям по-широки снимки за панорамата…"))
             engine.refitForPanorama(wasOn)?.let { if (it is ChangeResult.Failed) report(it) }
         } finally {
             _busy.value = false
@@ -714,14 +735,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun prepareNow() {
         scheduler.enqueueRefill(replace = true)
-        say("Подготвям нови снимки на заден план")
+        say(tr("Подготвям нови снимки на заден план"))
     }
 
     fun clearQueue() {
         viewModelScope.launch {
             engine.clearQueue()
             scheduler.enqueueRefill(replace = true)
-            say("Готовите снимки са изтрити – ще изтегля нови")
+            say(tr("Готовите снимки са изтрити – ще изтегля нови"))
         }
     }
 
@@ -731,13 +752,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             ChangeResult.NoImage -> _messages.emit(
                 UiMessage(
                     when {
-                        settings.value.photoMode == PhotoMode.MINE -> "Още нямаш добавени снимки. Добави ги от „Моите снимки“."
-                        settings.value.wifiOnly -> "Няма готови снимки. Ще изтегля, когато има Wi-Fi."
-                        else -> "Няма готови снимки и интернет. Тапетът остава същият."
+                        settings.value.photoMode == PhotoMode.MINE -> tr("Още нямаш добавени снимки. Добави ги от „Моите снимки“.")
+                        settings.value.wifiOnly -> tr("Няма готови снимки. Ще изтегля, когато има Wi-Fi.")
+                        else -> tr("Няма готови снимки и интернет. Тапетът остава същият.")
                     },
                 ),
             )
-            is ChangeResult.Failed -> _messages.emit(UiMessage("Неуспешна смяна: ${r.message}"))
+            is ChangeResult.Failed -> _messages.emit(UiMessage(tr("Неуспешна смяна: {0}", r.message)))
         }
     }
 
@@ -772,9 +793,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val r = engine.importMine(uris) { done, total -> _importing.value = done to total }
                 say(
                     buildString {
-                        append(if (r.added == 1) "Добавена 1 снимка" else "Добавени ${r.added} снимки")
-                        if (r.failed > 0) append(", ${r.failed} не можаха да се отворят")
-                        if (r.skipped > 0) append(", ${r.skipped} над лимита от ${MyPhotos.MAX_PHOTOS}")
+                        append(if (r.added == 1) tr("Добавена 1 снимка") else tr("Добавени {0} снимки", r.added))
+                        if (r.failed > 0) append(tr(", {0} не можаха да се отворят", r.failed))
+                        if (r.skipped > 0) append(tr(", {0} над лимита от {1}", r.skipped, MyPhotos.MAX_PHOTOS))
                     },
                 )
             } finally {
@@ -786,7 +807,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun removeMine(key: String) {
         viewModelScope.launch {
             engine.removeMine(key)
-            say("Снимката е махната от приложението (в галерията си остава)")
+            say(tr("Снимката е махната от приложението (в галерията си остава)"))
         }
     }
 
@@ -800,7 +821,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (r is ChangeResult.Changed) {
                     _previewKey.value = null
                     scrollTo(r.image.key)
-                    say("Тапетът е сменен")
+                    say(tr("Тапетът е сменен"))
                 } else {
                     report(r)
                 }
@@ -816,8 +837,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val holdNow = settings.value.autoChange
         updateSettings { it.copy(autoChange = !holdNow) }
         say(
-            if (holdNow) "Тапетът е задържан – няма да се сменя сам, докато не натиснеш „Пусни“."
-            else "Автоматичната смяна е пусната отново.",
+            if (holdNow) tr("Тапетът е задържан – няма да се сменя сам, докато не натиснеш „Пусни“.")
+            else tr("Автоматичната смяна е пусната отново."),
         )
     }
 
@@ -862,9 +883,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 // The frame has the wallpaper's shape: the screen, or wider for the panorama.
                 val sw = engine.outputWidth(preview.sourceWidth, preview.sourceHeight)
                 _crop.value = CropState.Ready(image, source, preview.bitmap, preview.sourceWidth, preview.sourceHeight, initial, sw, sh)
-                if (!source.fullPicture) say("Няма връзка с източника – можеш само да приближиш в рамките на сегашния тапет.")
+                if (!source.fullPicture) say(tr("Няма връзка с източника – можеш само да приближиш в рамките на сегашния тапет."))
             } catch (e: Exception) {
-                _crop.value = CropState.Error(e.message ?: "Снимката не може да се отвори")
+                _crop.value = CropState.Error(e.message ?: tr("Снимката не може да се отвори"))
             }
         }
     }
@@ -879,8 +900,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val r = engine.recrop(ready.image.key, ready.source, fraction)
                 if (r is ChangeResult.Changed) {
                     say(
-                        if (library.value.current?.key == ready.image.key) "Тапетът е обновен с новото изрязване"
-                        else "Изрязването е запазено – сложи снимката като тапет, когато поискаш",
+                        if (library.value.current?.key == ready.image.key) tr("Тапетът е обновен с новото изрязване")
+                        else tr("Изрязването е запазено – сложи снимката като тапет, когато поискаш"),
                     )
                     closeCrop()
                     onDone()

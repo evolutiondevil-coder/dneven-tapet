@@ -30,6 +30,7 @@ import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.security.MessageDigest
 import java.time.LocalDate
+import bg.dnevnitapet.i18n.tr
 
 enum class Trigger {
     MANUAL,
@@ -100,7 +101,7 @@ class WallpaperEngine(
                     return@withContext r
                 }
                 if (mode == PhotoMode.MINE) {
-                    log("Няма добавени собствени снимки – тапетът остава същият")
+                    log(tr("Няма добавени собствени снимки – тапетът остава същият"))
                     return@withContext ChangeResult.NoImage
                 }
             }
@@ -111,14 +112,14 @@ class WallpaperEngine(
                 item = takeFromQueue(preferFresh = false)
             }
             if (item == null) {
-                log("Няма готова снимка – тапетът остава същият")
+                log(tr("Няма готова снимка – тапетът остава същият"))
                 return@withContext ChangeResult.NoImage
             }
             try {
                 setter.apply(File(item.file), homeTarget(), settings.value.liveOn)
             } catch (e: Exception) {
                 library.update { it.copy(queue = listOf(item) + it.queue) }
-                log("Грешка при смяна на тапета: ${describe(e)}")
+                log(tr("Грешка при смяна на тапета: {0}", describe(e)))
                 return@withContext ChangeResult.Failed(describe(e))
             }
             val shown = commitShown(item, trigger)
@@ -152,14 +153,14 @@ class WallpaperEngine(
                 ?: if (s.photoMode == PhotoMode.MIXED) mineNext()?.let { (key, rest) -> rotationAfter = rest; album.first { it.key == key } } else null
         }
         if (item == null) {
-            log("Заключен екран: няма друга готова снимка – остава същата")
+            log(tr("Заключен екран: няма друга готова снимка – остава същата"))
             return
         }
         try {
             setter.apply(File(item.file), WallpaperTarget.LOCK, live = false)
         } catch (e: Exception) {
             if (!MyPhotos.isMine(item.key)) library.update { it.copy(queue = listOf(item) + it.queue) }
-            log("Заключен екран: ${describe(e)}")
+            log(tr("Заключен екран: {0}", describe(e)))
             return
         }
         library.update {
@@ -167,7 +168,7 @@ class WallpaperEngine(
                 lockCurrent = item.copy(shownAt = clock()),
                 myRotation = rotationAfter ?: it.myRotation,
                 seen = (it.seen + item.key).distinct().takeLast(SEEN_LIMIT),
-                log = appendLog(it.log, "Заключен екран: " + item.candidate.title),
+                log = appendLog(it.log, tr("Заключен екран: ") + item.candidate.title),
             )
         }
     }
@@ -176,7 +177,7 @@ class WallpaperEngine(
     suspend fun leaveLive() = changeMutex.withLock {
         withContext(Dispatchers.IO) {
             val file = library.value.current?.file?.let(::File)?.takeIf { it.exists() } ?: return@withContext
-            runCatching { setter.leavePanorama(file) }.onFailure { log("Грешка при смяна на тапета: ${describe(it)}") }
+            runCatching { setter.leavePanorama(file) }.onFailure { log(tr("Грешка при смяна на тапета: {0}", describe(it))) }
         }
     }
 
@@ -192,15 +193,15 @@ class WallpaperEngine(
         val prepared = try {
             withContext(Dispatchers.IO) { prepare(c, relaxed = relaxed) }
         } catch (e: Exception) {
-            log("Снимка от архива не се изтегли: ${describe(e)}")
-            return ChangeResult.Failed("Не успях да изтегля снимката – провери връзката")
+            log(tr("Снимка от архива не се изтегли: {0}", describe(e)))
+            return ChangeResult.Failed(tr("Не успях да изтегля снимката – провери връзката"))
         }
         return changeMutex.withLock {
             withContext(Dispatchers.IO) {
                 try {
                     setter.apply(File(prepared.file), homeTarget(), settings.value.liveOn)
                 } catch (e: Exception) {
-                    log("Грешка при смяна на тапета: ${describe(e)}")
+                    log(tr("Грешка при смяна на тапета: {0}", describe(e)))
                     return@withContext ChangeResult.Failed(describe(e))
                 }
                 val shown = commitShown(prepared, Trigger.MANUAL)
@@ -222,7 +223,7 @@ class WallpaperEngine(
      */
     private suspend fun applyCopyLocked(image: StoredImage, trigger: Trigger): ChangeResult {
         val src = File(image.file)
-        if (!src.exists()) return ChangeResult.Failed("Файлът на снимката липсва")
+        if (!src.exists()) return ChangeResult.Failed(tr("Файлът на снимката липсва"))
         val copy = File(imagesDir, fileName(image.key) + "-" + clock() + ".jpg")
         imagesDir.mkdirs()
         src.copyTo(copy, overwrite = true)
@@ -230,7 +231,7 @@ class WallpaperEngine(
             setter.apply(copy, homeTarget(), settings.value.liveOn)
         } catch (e: Exception) {
             copy.delete()
-            log("Грешка при смяна на тапета: ${describe(e)}")
+            log(tr("Грешка при смяна на тапета: {0}", describe(e)))
             return ChangeResult.Failed(describe(e))
         }
         val shown = commitShown(image.copy(file = copy.path), trigger)
@@ -268,7 +269,7 @@ class WallpaperEngine(
     suspend fun chooseMine(key: String): ChangeResult = changeMutex.withLock {
         withContext(Dispatchers.IO) {
             val item = library.value.myPhotos.firstOrNull { it.key == key }
-                ?: return@withContext ChangeResult.Failed("Снимката вече не е в „Моите снимки“")
+                ?: return@withContext ChangeResult.Failed(tr("Снимката вече не е в „Моите снимки“"))
             val r = applyCopyLocked(item, Trigger.MANUAL)
             if (r is ChangeResult.Changed) library.update { it.copy(myRotation = it.myRotation - key) }
             r
@@ -298,7 +299,7 @@ class WallpaperEngine(
             val tmp = File(downloadsDir, "import-$id.tmp")
             try {
                 context.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } }
-                    ?: error("снимката не може да се прочете")
+                    ?: error(tr("снимката не може да се прочете"))
                 val taken = runCatching {
                     androidx.exifinterface.media.ExifInterface(tmp).getAttribute(androidx.exifinterface.media.ExifInterface.TAG_DATETIME_ORIGINAL)
                 }.getOrNull()
@@ -309,12 +310,12 @@ class WallpaperEngine(
                 processor.saveUprightCopy(tmp, src, MINE_SOURCE_SIDE)
                 val wall = File(mineDir, "$id.jpg")
                 val out = processor.process(src, wall, tw, th, composedForPortrait = false, allowUpscale = true, maxTargetW = maxW)
-                val bg = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", java.util.Locale("bg"))
+                val takenFormat = java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy", bg.dnevnitapet.i18n.I18n.locale)
                 val candidate = Candidate(
                     key = "${MyPhotos.SOURCE_ID}:$id",
                     sourceId = MyPhotos.SOURCE_ID,
-                    title = "Моя снимка",
-                    description = date?.let { "Заснета на " + it.format(bg) }.orEmpty(),
+                    title = tr("Моя снимка"),
+                    description = date?.let { tr("Заснета на ") + it.format(takenFormat) }.orEmpty(),
                     date = date?.toString().orEmpty(),
                     variants = emptyList(),
                 )
@@ -327,13 +328,13 @@ class WallpaperEngine(
                 added++
             } catch (e: Exception) {
                 failed++
-                log("Моя снимка не се добави: ${describe(e)}")
+                log(tr("Моя снимка не се добави: {0}", describe(e)))
             } finally {
                 tmp.delete()
             }
         }
         onProgress(todo.size, todo.size)
-        if (added > 0) log("Добавени собствени снимки: $added")
+        if (added > 0) log(tr("Добавени собствени снимки: {0}", added))
         ImportResult(added, failed, skipped = uris.size - todo.size)
     }
 
@@ -364,13 +365,13 @@ class WallpaperEngine(
         withContext(Dispatchers.IO) {
             val queue = library.value.queue
             val index = queue.indexOfFirst { it.key == key }
-            if (index < 0) return@withContext ChangeResult.Failed("Снимката вече не е в списъка")
+            if (index < 0) return@withContext ChangeResult.Failed(tr("Снимката вече не е в списъка"))
             val item = queue[index]
-            if (!File(item.file).exists()) return@withContext ChangeResult.Failed("Файлът на снимката липсва")
+            if (!File(item.file).exists()) return@withContext ChangeResult.Failed(tr("Файлът на снимката липсва"))
             try {
                 setter.apply(File(item.file), homeTarget(), settings.value.liveOn)
             } catch (e: Exception) {
-                log("Грешка при смяна на тапета: ${describe(e)}")
+                log(tr("Грешка при смяна на тапета: {0}", describe(e)))
                 return@withContext ChangeResult.Failed(describe(e))
             }
             val skipped = queue.take(index).map { it.key }.toSet()
@@ -426,9 +427,9 @@ class WallpaperEngine(
     }
 
     private fun logPrefix(trigger: Trigger) = when (trigger) {
-        Trigger.SCHEDULED -> "Автоматична смяна: "
-        Trigger.DOUBLE_TAP -> "Двойно докосване: "
-        else -> "Смяна: "
+        Trigger.SCHEDULED -> tr("Автоматична смяна: ")
+        Trigger.DOUBLE_TAP -> tr("Двойно докосване: ")
+        else -> tr("Смяна: ")
     }
 
     /**
@@ -498,7 +499,7 @@ class WallpaperEngine(
                 disliked = if (known == null) st.disliked else (st.disliked.filter { it.key != key } + known).takeLast(DISLIKED_LIMIT),
                 queue = st.queue.filter { it.key != key },
                 history = st.history.filter { it.key != key },
-                log = appendLog(st.log, "Скрита завинаги: " + (st.current?.takeIf { it.key == key }?.candidate?.title ?: key)),
+                log = appendLog(st.log, tr("Скрита завинаги: ") + (st.current?.takeIf { it.key == key }?.candidate?.title ?: key)),
             )
         }
         return if (library.value.current?.key == key) next(Trigger.MANUAL) else null
@@ -554,7 +555,7 @@ class WallpaperEngine(
                 return@withContext EditSource(file, variant.url, fullPicture = true)
             } catch (e: Exception) {
                 file.delete()
-                log("Нагласяне: оригиналът не се изтегли (${describe(e)}) – ползвам тапета")
+                log(tr("Нагласяне: оригиналът не се изтегли ({0}) – ползвам тапета", describe(e)))
             }
         }
         EditSource(File(image.file), "", fullPicture = false)
@@ -568,7 +569,7 @@ class WallpaperEngine(
         withContext(Dispatchers.IO) {
             val st = library.value
             val image = (listOfNotNull(st.current) + st.queue + st.history + st.favorites + st.myPhotos).firstOrNull { it.key == key }
-                ?: return@withContext ChangeResult.Failed("Снимката вече не е в списъка")
+                ?: return@withContext ChangeResult.Failed(tr("Снимката вече не е в списъка"))
             val (tw, th, maxW) = sizes()
             imagesDir.mkdirs()
             val dest = File(imagesDir, fileName(key) + "-" + clock() + ".jpg")
@@ -605,7 +606,7 @@ class WallpaperEngine(
                     history = s.history.map { if (it.key == key) edited(it, dest.path) else it },
                     favorites = s.favorites.map { if (it.key == key) edited(it, it.file) else it },
                     myPhotos = s.myPhotos.map { if (it.key == key) edited(it, it.file) else it },
-                    log = appendLog(s.log, "Ново изрязване: " + image.candidate.title),
+                    log = appendLog(s.log, tr("Ново изрязване: ") + image.candidate.title),
                 )
             }
             if (isCurrent) onChanged?.invoke()
@@ -639,7 +640,7 @@ class WallpaperEngine(
                     tmp.copyTo(File(photo.file), overwrite = true)
                     photo.copy(width = out.width, height = out.height, cropLeft = out.crop.left, cropTop = out.crop.top, cropRight = out.crop.right, cropBottom = out.crop.bottom)
                 } catch (e: Exception) {
-                    log("Моя снимка не се изряза наново: ${describe(e)}")
+                    log(tr("Моя снимка не се изряза наново: {0}", describe(e)))
                     photo
                 } finally {
                     tmp.delete()
@@ -665,7 +666,7 @@ class WallpaperEngine(
                     }
                 } catch (e: Exception) {
                     dest.delete()
-                    log("Тапетът не се изряза наново: ${describe(e)}")
+                    log(tr("Тапетът не се изряза наново: {0}", describe(e)))
                     null
                 }
                 val file = File(remade?.file ?: current.file)
@@ -678,11 +679,11 @@ class WallpaperEngine(
                     ChangeResult.Changed(remade ?: current)
                 } catch (e: Exception) {
                     dest.delete()
-                    log("Грешка при смяна на тапета: ${describe(e)}")
+                    log(tr("Грешка при смяна на тапета: {0}", describe(e)))
                     ChangeResult.Failed(describe(e))
                 }
             }
-            log(if (settings.value.panoramaOn) "Панорама: снимките се подготвят по-широки" else "Панорамата е изключена")
+            log(if (settings.value.panoramaOn) tr("Панорама: снимките се подготвят по-широки") else tr("Панорамата е изключена"))
             cleanupFiles()
             result
         }
@@ -735,7 +736,7 @@ class WallpaperEngine(
                             pool = st.pool.filter { it.key != candidate.key },
                             seen = (st.seen + candidate.key).takeLast(SEEN_LIMIT),
                             lastSourceUsed = candidate.sourceId,
-                            log = appendLog(st.log, "Пропусната снимка (${SourceRegistry.name(candidate.sourceId)}): ${describe(e)}"),
+                            log = appendLog(st.log, tr("Пропусната снимка ({0}): {1}", SourceRegistry.name(candidate.sourceId), describe(e))),
                         )
                     }
                 }
@@ -761,7 +762,7 @@ class WallpaperEngine(
         val choice = (if (maxW > tw) VariantChooser.choose(candidate.variants, maxW, th) else null)
             ?: VariantChooser.choose(candidate.variants, tw, th)
             ?: candidate.variants.maxByOrNull { it.width }?.takeIf { relaxed }?.let { VariantChooser.Choice(it.url, it, VariantChooser.upscale(it, tw, th)) }
-            ?: throw IllegalStateException("няма достатъчно голям вариант")
+            ?: throw IllegalStateException(tr("няма достатъчно голям вариант"))
         downloadsDir.mkdirs()
         val download = File(downloadsDir, fileName(candidate.key) + ".download")
         try {
@@ -868,12 +869,12 @@ class WallpaperEngine(
                     statuses[src.id] = old.copy(
                         lastSuccessAt = now, lastAttemptAt = now, lastCount = result.candidates.size,
                         lastFreshFetchAt = if (wasFresh) now else old.lastFreshFetchAt,
-                        lastError = if (result.candidates.isEmpty()) "Източникът не върна снимки" else "",
+                        lastError = if (result.candidates.isEmpty()) tr("Източникът не върна снимки") else "",
                         lastErrorAt = if (result.candidates.isEmpty()) now else old.lastErrorAt,
                     )
                 }.onFailure { e ->
                     statuses[src.id] = old.copy(lastAttemptAt = now, lastErrorAt = now, lastError = describe(e))
-                    log = appendLog(log, "${SourceRegistry.name(src.id)}: грешка – ${describe(e)}")
+                    log = appendLog(log, tr("{0}: грешка – {1}", SourceRegistry.name(src.id), describe(e)))
                 }
             }
             st.copy(pool = pool.takeLast(POOL_LIMIT), sourceStatus = statuses, cursors = cursors, log = log)

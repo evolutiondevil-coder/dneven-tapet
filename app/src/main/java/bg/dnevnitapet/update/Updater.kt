@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.IOException
+import bg.dnevnitapet.i18n.tr
 
 /** A published version on GitHub with its installable file. */
 data class ReleaseInfo(
@@ -126,7 +127,7 @@ class Updater(private val context: Context, private val http: Http) {
         }
         if (!isThisApp(file)) {
             file.delete()
-            throw IOException("Изтегленият файл не е Дневен тапет")
+            throw IOException(tr("Изтегленият файл не е Дневен тапет"))
         }
         file
     }

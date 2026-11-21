@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import bg.dnevnitapet.model.StoredImage
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Save to gallery" action. On Android 7–9 it first asks for the storage permission
@@ -22,7 +23,7 @@ fun rememberGallerySave(vm: MainViewModel): (StoredImage) -> Unit {
         pending = null
         when {
             granted && image != null -> vm.save(image)
-            !granted -> vm.hint("Без разрешение за снимките не мога да запазя в галерията")
+            !granted -> vm.hint(tr("Без разрешение за снимките не мога да запазя в галерията"))
         }
     }
     return { image ->

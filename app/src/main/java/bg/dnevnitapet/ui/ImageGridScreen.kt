@@ -53,6 +53,7 @@ import bg.dnevnitapet.wallpaper.MyPhotos
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
+import bg.dnevnitapet.i18n.tr
 
 /** History (last ~30 wallpapers) or favourites, as a grid of thumbnails. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,9 +74,9 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (favorites) "Любими" else "История") },
+                title = { Text(if (favorites) tr("Любими") else tr("История")) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("Назад")) }
                 },
             )
         },
@@ -84,8 +85,8 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
         if (items.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    if (favorites) "Още нямаш любими. Докосни ♡ върху снимка, която харесваш."
-                    else "Тук ще виждаш последните 30 тапета.",
+                    if (favorites) tr("Още нямаш любими. Докосни ♡ върху снимка, която харесваш.")
+                    else tr("Тук ще виждаш последните 30 тапета."),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -116,22 +117,22 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
             actions = listOf(
                 SheetAction(
                     if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    if (isFavorite) "Любима" else "Харесай",
+                    if (isFavorite) tr("Любима") else tr("Харесай"),
                     tint = if (isFavorite) Color(0xFFFF6B81) else null,
                 ) {
                     vm.toggleFavorite(image.key)
                     if (favorites && isFavorite) selected = null
                 },
-                SheetAction(Icons.Outlined.Crop, "Нагласи", enabled = !busy) {
+                SheetAction(Icons.Outlined.Crop, tr("Нагласи"), enabled = !busy) {
                     vm.openCrop(image)
                     selected = null
                     onOpenCrop()
                 },
-                SheetAction(Icons.Outlined.Download, "Запази", enabled = !MyPhotos.isMine(image.key)) { saveToGallery(image) },
-                SheetAction(Icons.Outlined.Share, "Сподели") {
-                    if (!Share.share(context, image)) vm.hint("Няма приложение, с което да се сподели")
+                SheetAction(Icons.Outlined.Download, tr("Запази"), enabled = !MyPhotos.isMine(image.key)) { saveToGallery(image) },
+                SheetAction(Icons.Outlined.Share, tr("Сподели")) {
+                    if (!Share.share(context, image)) vm.hint(tr("Няма приложение, с което да се сподели"))
                 },
-                SheetAction(Icons.Outlined.Info, "Инфо") {
+                SheetAction(Icons.Outlined.Info, tr("Инфо")) {
                     info = image
                     selected = null
                 },
@@ -173,7 +174,7 @@ private fun Thumbnail(image: StoredImage, title: String, isCurrent: Boolean, isF
                     modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
                 ) {
                     Text(
-                        "Сега", color = MaterialTheme.colorScheme.onPrimary,
+                        tr("Сега"), color = MaterialTheme.colorScheme.onPrimary,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )

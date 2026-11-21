@@ -10,6 +10,7 @@ import bg.dnevnitapet.wallpaper.Trigger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import bg.dnevnitapet.i18n.tr
 
 /** Quick Settings tile "Следващ тапет": one tap changes the wallpaper. */
 class NextTileService : TileService() {
@@ -33,7 +34,7 @@ class NextTileService : TileService() {
                 render(busy = false)
                 val message = when (result) {
                     is ChangeResult.Changed -> null
-                    ChangeResult.NoImage -> "Няма готови снимки – ще изтегля, когато има интернет"
+                    ChangeResult.NoImage -> tr("Няма готови снимки – ще изтегля, когато има интернет")
                     is ChangeResult.Failed -> result.message
                 }
                 if (message != null) Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
@@ -43,10 +44,10 @@ class NextTileService : TileService() {
 
     private fun render(busy: Boolean) {
         val tile = qsTile ?: return
-        tile.label = "Следващ тапет"
+        tile.label = tr("Следващ тапет")
         tile.state = if (busy) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         if (Build.VERSION.SDK_INT >= 29) {
-            tile.subtitle = if (busy) "Сменям…" else Graph.get(this).library.value.current?.candidate?.title ?: ""
+            tile.subtitle = if (busy) tr("Сменям…") else Graph.get(this).library.value.current?.candidate?.title ?: ""
         }
         tile.updateTile()
     }

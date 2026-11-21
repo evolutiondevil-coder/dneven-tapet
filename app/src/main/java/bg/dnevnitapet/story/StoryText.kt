@@ -1,6 +1,9 @@
 package bg.dnevnitapet.story
 
 import bg.dnevnitapet.model.Candidate
+import bg.dnevnitapet.i18n.AppLanguage
+import bg.dnevnitapet.i18n.I18n
+import bg.dnevnitapet.i18n.tr
 import bg.dnevnitapet.wallpaper.MyPhotos
 
 /** Which texts of a picture are translated, and how. Pure logic, unit-tested. */
@@ -17,7 +20,7 @@ object StoryText {
 
     /** Texts are translated from English only (Bing's other markets keep their own language). */
     fun translatable(c: Candidate): Boolean =
-        c.sourceId != MyPhotos.SOURCE_ID && (c.lang.isBlank() || c.lang == "en")
+        I18n.language == AppLanguage.BG && c.sourceId != MyPhotos.SOURCE_ID && (c.lang.isBlank() || c.lang == "en")
 
     fun original(c: Candidate) = Story(
         title = c.title.trim(),
@@ -36,8 +39,12 @@ object StoryText {
     }
 
     /** The title shown in the app: in Bulgarian once translated ([entries] = the translations made so far). */
-    fun title(c: Candidate, entries: Map<String, String>): String =
-        if (translatable(c)) entries[c.title.trim()] ?: c.title else c.title
+    fun title(c: Candidate, entries: Map<String, String>): String = when {
+        // Own photos are called "Моя снимка" in the app's language.
+        c.sourceId == MyPhotos.SOURCE_ID -> tr(c.title)
+        translatable(c) -> entries[c.title.trim()] ?: c.title
+        else -> c.title
+    }
 
     /** What "Прочети в Уикипедия" searches for: the place, or else the title. */
     fun wikipediaQuery(story: Story): String = story.location.ifBlank { story.title }

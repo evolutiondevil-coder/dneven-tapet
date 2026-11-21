@@ -54,7 +54,7 @@ data class Artwork(
 
     companion object {
         const val SOURCE_ID = "art"
-        const val MUSEUM = "Институт по изкуствата, Чикаго"
+        val MUSEUM: String get() = tr("Институт по изкуствата, Чикаго")
     }
 }
 

@@ -16,6 +16,7 @@ import bg.dnevnitapet.sources.parseJson
 import bg.dnevnitapet.sources.searchQuery
 import bg.dnevnitapet.sources.str
 import java.net.URLEncoder
+import bg.dnevnitapet.i18n.tr
 
 /** Pexels official API, with the user's own free API key. Searches by category. */
 class PexelsSource : ImageSource {
@@ -43,7 +44,7 @@ class PexelsSource : ImageSource {
 object PexelsParser {
     fun parse(json: String, category: Category?): List<Candidate> {
         val photos = parseJson(json).obj()?.get("photos").arr()
-            ?: throw SourceFormatException("Pexels: неочакван отговор")
+            ?: throw SourceFormatException(tr("Pexels: неочакван отговор"))
         return photos.mapNotNull { el ->
             val p = el.obj() ?: return@mapNotNull null
             val id = p.str("id") ?: return@mapNotNull null
@@ -55,7 +56,7 @@ object PexelsParser {
             Candidate(
                 key = "pexels:$id",
                 sourceId = "pexels",
-                title = p.str("alt")?.takeIf { it.isNotBlank() } ?: "Снимка от Pexels",
+                title = p.str("alt")?.takeIf { it.isNotBlank() } ?: tr("Снимка от Pexels"),
                 author = photographer,
                 copyright = if (photographer.isNotBlank()) "$photographer / Pexels" else "Pexels",
                 infoUrl = p.str("url").orEmpty(),

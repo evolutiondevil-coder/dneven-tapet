@@ -89,6 +89,7 @@ import bg.dnevnitapet.story.StoryText
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
+import bg.dnevnitapet.i18n.tr
 
 /**
  * "Архив": every picture seen on this phone (and older ones from NASA and Wikimedia), with search
@@ -122,8 +123,8 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Архив") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } },
+                title = { Text(tr("Архив")) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Назад")) } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -140,10 +141,10 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                     OutlinedTextField(
                         value = text,
                         onValueChange = { text = it },
-                        placeholder = { Text("Търси: море, Норвегия, залез…", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        placeholder = { Text(tr("Търси: море, Норвегия, залез…"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         trailingIcon = {
-                            if (text.isNotEmpty()) IconButton(onClick = { text = "" }) { Icon(Icons.Filled.Close, "Изчисти") }
+                            if (text.isNotEmpty()) IconButton(onClick = { text = "" }) { Icon(Icons.Filled.Close, tr("Изчисти")) }
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(28.dp),
@@ -151,7 +152,7 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item { ChoiceChip(selected = category == null, onClick = { category = null }, label = { Text("Всички") }) }
+                        item { ChoiceChip(selected = category == null, onClick = { category = null }, label = { Text(tr("Всички")) }) }
                         items(Category.entries.toList()) { c ->
                             ChoiceChip(selected = category == c, onClick = { category = if (category == c) null else c }, label = { Text(c.label) })
                         }
@@ -165,24 +166,24 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterMenu(
-                            label = country?.let(::bg) ?: "Държава",
+                            label = country?.let(::bg) ?: tr("Държава"),
                             selected = country != null,
                             options = listOf<String?>(null) + countries,
-                            optionLabel = { it?.let(::bg) ?: "Всички държави" },
+                            optionLabel = { it?.let(::bg) ?: tr("Всички държави") },
                             onSelect = { country = it },
                         )
                         FilterMenu(
-                            label = source?.let(SourceRegistry::name)?.substringBefore(" –") ?: "Източник",
+                            label = source?.let(SourceRegistry::name)?.substringBefore(" –") ?: tr("Източник"),
                             selected = source != null,
                             options = listOf<String?>(null) + sources,
-                            optionLabel = { it?.let(SourceRegistry::name) ?: "Всички източници" },
+                            optionLabel = { it?.let(SourceRegistry::name) ?: tr("Всички източници") },
                             onSelect = { source = it },
                         )
                         FilterMenu(
-                            label = year?.toString() ?: "Година",
+                            label = year?.toString() ?: tr("Година"),
                             selected = year != null,
                             options = listOf<Int?>(null) + years,
-                            optionLabel = { it?.toString() ?: "Всички години" },
+                            optionLabel = { it?.toString() ?: tr("Всички години") },
                             onSelect = { year = it },
                         )
                     }
@@ -190,7 +191,7 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                         category?.label?.lowercase(), color?.let(ColorBucket::label), country?.let(::bg), year?.toString(),
                     )
                     Text(
-                        "${found.size} ${if (found.size == 1) "снимка" else "снимки"}" + summary.joinToString("") { " · $it" },
+                        "${found.size} ${if (found.size == 1) tr("снимка") else tr("снимки")}" + summary.joinToString("") { " · $it" },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 4.dp, top = 2.dp),
@@ -202,8 +203,8 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            if (entries.isEmpty()) "Тук се събират всички снимки, които видиш. Можеш да заредиш и стари снимки от NASA и Wikimedia."
-                            else "Нищо не намерих. Опитай с друга дума или махни някой филтър.",
+                            if (entries.isEmpty()) tr("Тук се събират всички снимки, които видиш. Можеш да заредиш и стари снимки от NASA и Wikimedia.")
+                            else tr("Нищо не намерих. Опитай с друга дума или махни някой филтър."),
                             style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center,
                         )
@@ -215,7 +216,7 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                                 country = null
                                 source = null
                                 year = null
-                            }) { Text("Изчисти търсенето") }
+                            }) { Text(tr("Изчисти търсенето")) }
                         }
                     }
                 }
@@ -231,13 +232,13 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                         if (loading) {
                             CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(10.dp))
-                            Text("Зареждам…")
+                            Text(tr("Зареждам…"))
                         } else {
-                            Text("Още от архива на NASA и Wikimedia")
+                            Text(tr("Още от архива на NASA и Wikimedia"))
                         }
                     }
                     Text(
-                        "По-стари снимки на деня – няколко наведнъж.",
+                        tr("По-стари снимки на деня – няколко наведнъж."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp),
@@ -345,7 +346,7 @@ private fun ArchiveSheet(vm: MainViewModel, e: ArchiveEntry, title: String, onDi
                 TextButton(onClick = { story = true }) {
                     Icon(Icons.Outlined.AutoStories, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Историята")
+                    Text(tr("Историята"))
                 }
                 if (c.infoUrl.isNotBlank()) {
                     TextButton(onClick = {
@@ -353,7 +354,7 @@ private fun ArchiveSheet(vm: MainViewModel, e: ArchiveEntry, title: String, onDi
                     }) {
                         Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("В браузъра")
+                        Text(tr("В браузъра"))
                     }
                 }
             }
@@ -366,13 +367,13 @@ private fun ArchiveSheet(vm: MainViewModel, e: ArchiveEntry, title: String, onDi
             ) {
                 when {
                     busy -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = OnSelectedOrange)
-                    isCurrent -> Text("Това е тапетът ти", maxLines = 1, softWrap = false)
-                    else -> Text("Сложи като тапет", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
+                    isCurrent -> Text(tr("Това е тапетът ти"), maxLines = 1, softWrap = false)
+                    else -> Text(tr("Сложи като тапет"), style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
                 }
             }
             if (local == null && !isCurrent) {
                 Text(
-                    "Снимката ще се изтегли в пълен размер.",
+                    tr("Снимката ще се изтегли в пълен размер."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

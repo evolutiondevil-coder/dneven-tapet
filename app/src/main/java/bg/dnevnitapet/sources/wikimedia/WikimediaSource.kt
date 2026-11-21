@@ -15,6 +15,7 @@ import bg.dnevnitapet.sources.parseJson
 import bg.dnevnitapet.sources.str
 import java.net.URLEncoder
 import java.time.LocalDate
+import bg.dnevnitapet.i18n.tr
 
 /**
  * Wikimedia Commons "Picture of the day" through the official MediaWiki API.
@@ -24,7 +25,7 @@ import java.time.LocalDate
  */
 class WikimediaSource : ImageSource {
     override val id = "wikimedia"
-    override val displayName = "Wikimedia Commons – снимка на деня"
+    override val displayName = tr("Wikimedia Commons – снимка на деня")
 
     override suspend fun fetch(request: FetchRequest): FetchResult {
         val cursor = Cursor.parse(request.cursor)
@@ -49,7 +50,7 @@ class WikimediaSource : ImageSource {
         if (days.isEmpty()) return FetchResult(emptyList(), next.toString())
 
         val expanded = WikimediaParser.parseExpanded(request.http.getText(expandUrl(days)), days)
-        if (expanded.isEmpty()) throw SourceFormatException("Wikimedia: няма снимки за тези дни")
+        if (expanded.isEmpty()) throw SourceFormatException(tr("Wikimedia: няма снимки за тези дни"))
         val titles = expanded.values.map { "File:" + it.file }
         val info = WikimediaParser.parseImageInfo(request.http.getText(imageInfoUrl(titles)))
         return FetchResult(WikimediaParser.build(expanded, info), next.toString())
@@ -112,7 +113,7 @@ object WikimediaParser {
 
     fun parseExpanded(json: String, days: List<LocalDate>): Map<LocalDate, Expanded> {
         val wikitext = parseJson(json).obj().child("expandtemplates").str("wikitext")
-            ?: throw SourceFormatException("Wikimedia: неочакван отговор")
+            ?: throw SourceFormatException(tr("Wikimedia: неочакван отговор"))
         val parts = wikitext.split(DAY_SEPARATOR.trim()).map { it.trim() }
         val result = LinkedHashMap<LocalDate, Expanded>()
         parts.forEachIndexed { i, part ->
@@ -128,7 +129,7 @@ object WikimediaParser {
     }
 
     fun parseImageInfo(json: String): Map<String, Info> {
-        val query = parseJson(json).obj().child("query") ?: throw SourceFormatException("Wikimedia: неочакван отговор")
+        val query = parseJson(json).obj().child("query") ?: throw SourceFormatException(tr("Wikimedia: неочакван отговор"))
         val result = HashMap<String, Info>()
         query["pages"].arr()?.forEach { pageEl ->
             val page = pageEl.obj() ?: return@forEach
