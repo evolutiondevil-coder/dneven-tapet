@@ -291,10 +291,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
                         .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
                 ) {
-                    if (!settings.onboarded) {
-                        Onboarding(unrestricted, busy, onAllow = { Power.requestUnrestricted(context) }, onStart = vm::startOnboarding)
-                        return@Column
-                    }
+                    if (!settings.onboarded) return@Column
                     if (!unrestricted && settings.autoChange) {
                         Surface(
                             onClick = { onNavigate(Screen.SETTINGS) },
@@ -493,7 +490,32 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             }
         }
 
+        // First start: four short pages about the app.
+        if (!settings.onboarded) {
+            WelcomeScreen(unrestricted, busy, onAllow = { Power.requestUnrestricted(context) }, onStart = vm::startOnboarding)
+        }
+        // First opening of the day: "Добро утро" and today's picture.
+        val greeting by vm.greeting.collectAsStateWithLifecycle()
+        AnimatedVisibility(visible = greeting != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+            val g = greeting
+            if (g != null) DailyGreeting(g.greeting, g.date, g.line, onDone = vm::closeGreeting)
+        }
+
         SnackbarHost(snackbar, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp))
+    }
+
+    // Once after an update: "Какво ново".
+    val whatsNew by vm.whatsNew.collectAsStateWithLifecycle()
+    if (whatsNew.isNotEmpty() && settings.onboarded) {
+        WhatsNewSheet(
+            bg.dnevnitapet.BuildConfig.VERSION_NAME,
+            whatsNew,
+            onOpenSettings = {
+                vm.closeWhatsNew()
+                onNavigate(Screen.SETTINGS)
+            },
+            onDone = vm::closeWhatsNew,
+        )
     }
 
     if (showInfo && shown != null) {
@@ -606,44 +628,6 @@ private fun HoldChip(held: Boolean, onClick: () -> Unit) {
                 maxLines = 1,
                 softWrap = false,
             )
-        }
-    }
-}
-
-@Composable
-private fun Onboarding(unrestricted: Boolean, busy: Boolean, onAllow: () -> Unit, onStart: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-        // Explicit: with a translucent colour Compose cannot pick the matching text colour itself.
-        contentColor = MaterialTheme.colorScheme.onSurface,
-    ) {
-        Column(Modifier.padding(20.dp)) {
-            Text("Добре дошъл!", style = MaterialTheme.typography.headlineSmall)
-            Text(
-                "Всеки ден ще слагам нова снимка на началния екран – от Bing, Windows Spotlight, " +
-                    "Wikimedia и NASA. Плъзгай наляво и надясно, за да разглеждаш, „Избери“ слага снимката " +
-                    "за тапет, а докосване на снимката я показва на цял екран.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
-            )
-            Text("1. Разреши работа на заден план", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "Иначе телефонът може да „приспи“ приложението и да пропусне смяната.",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-            if (unrestricted) {
-                Text("✓ Разрешено", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-            } else {
-                OutlinedButton(onClick = onAllow) { Text("Разреши") }
-            }
-            Spacer(Modifier.height(14.dp))
-            Text("2. Сложи първия тапет", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(6.dp))
-            Button(onClick = onStart, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text("Започни")
-            }
         }
     }
 }

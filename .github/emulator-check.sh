@@ -70,6 +70,9 @@ shot 01-home-after-tests 4
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
 shot 02-welcome 5
+# Welcome: four short pages ("Напред", "Пропусни" jumps to the last one with "Започни").
+tap "Напред" && shot 02a-welcome-page-2 2
+tap "Пропусни" && shot 02b-welcome-last-page 2
 tap "Започни" && shot 03-main-screen 30
 
 # Browsing must only preview; "Избери" is what changes the wallpaper.
@@ -185,6 +188,7 @@ if [ -n "$REL" ]; then
   adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
   shot 20-release-welcome 5
   r0=$(wallpaper_state)
+  tap "Пропусни" && sleep 2
   tap "Започни" && shot 21-release-main 30
   r1=$(wallpaper_state)
   expect_changed "release APK: Започни set a wallpaper" "$r0" "$r1"

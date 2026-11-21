@@ -102,3 +102,12 @@ dependencies {
     androidTestImplementation("androidx.test:core-ktx:1.6.1")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }
+
+// "Какво ново": the release notes travel inside the app (shown once after an update).
+val releaseNotesDir = layout.buildDirectory.dir("generated/releaseNotes")
+val copyReleaseNotes = tasks.register<Copy>("copyReleaseNotes") {
+    from(rootProject.file("RELEASE_NOTES.md"))
+    into(releaseNotesDir)
+}
+android.sourceSets.getByName("main").assets.srcDir(releaseNotesDir)
+tasks.named("preBuild") { dependsOn(copyReleaseNotes) }

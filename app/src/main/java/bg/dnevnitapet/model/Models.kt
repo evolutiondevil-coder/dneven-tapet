@@ -151,6 +151,10 @@ data class Settings(
     val learnTaste: Boolean = true,
     /** Look on GitHub for a newer version when the app starts. */
     val checkUpdates: Boolean = true,
+    /** The version whose "Какво ново" was already shown. */
+    val lastSeenVersion: String = "",
+    /** yyyy-MM-dd of the last morning greeting ("Добро утро"), shown once a day. */
+    val greetedDay: String = "",
     val frequency: FrequencyMode = FrequencyMode.DAILY,
     /** Minutes after midnight for the daily change. */
     val dailyMinuteOfDay: Int = 5 * 60,

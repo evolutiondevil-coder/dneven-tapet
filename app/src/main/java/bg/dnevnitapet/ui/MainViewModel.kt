@@ -128,8 +128,64 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------------------------------------------------------- what's new, daily greeting
+
+    data class GreetingInfo(val greeting: String, val date: String, val line: String)
+
+    private val _whatsNew = MutableStateFlow<List<bg.dnevnitapet.update.ReleaseNotes.Item>>(emptyList())
+
+    /** "Какво ново" items, shown once after an update (empty = nothing to show). */
+    val whatsNew: StateFlow<List<bg.dnevnitapet.update.ReleaseNotes.Item>> = _whatsNew.asStateFlow()
+
+    private val _greeting = MutableStateFlow<GreetingInfo?>(null)
+
+    /** The greeting of the first opening of the day. */
+    val greeting: StateFlow<GreetingInfo?> = _greeting.asStateFlow()
+
+    fun closeWhatsNew() {
+        _whatsNew.value = emptyList()
+        viewModelScope.launch { graph.settings.update { it.copy(lastSeenVersion = bg.dnevnitapet.BuildConfig.VERSION_NAME) } }
+    }
+
+    fun closeGreeting() {
+        _greeting.value = null
+    }
+
+    /** After an update "Какво ново" (once); otherwise, on the first opening of the day, the greeting. */
+    private fun checkWelcome() {
+        val s = settings.value
+        if (!s.onboarded || _whatsNew.value.isNotEmpty() || _greeting.value != null) return
+        val today = java.time.LocalDate.now().toString()
+        val version = bg.dnevnitapet.BuildConfig.VERSION_NAME
+        if (bg.dnevnitapet.update.Versions.parse(version) != null && s.lastSeenVersion != version) {
+            val items = runCatching {
+                getApplication<Application>().assets.open("RELEASE_NOTES.md").bufferedReader().use {
+                    bg.dnevnitapet.update.ReleaseNotes.current(it.readText())
+                }
+            }.getOrDefault(emptyList())
+            viewModelScope.launch { graph.settings.update { it.copy(greetedDay = today, lastSeenVersion = if (items.isEmpty()) version else it.lastSeenVersion) } }
+            if (items.isNotEmpty()) {
+                _whatsNew.value = items
+                return
+            }
+        }
+        if (s.greetedDay == today) return
+        viewModelScope.launch { graph.settings.update { it.copy(greetedDay = today) } }
+        val current = library.value.current
+        _greeting.value = GreetingInfo(
+            greeting = Greeting.phrase(java.time.LocalTime.now().hour),
+            date = Greeting.date(java.time.LocalDate.now()),
+            line = when {
+                current == null -> "Днес ще ти сложа нова снимка."
+                MyPhotos.isMine(current.key) -> "Днешният ти тапет е твоя снимка."
+                else -> "Днешният ти тапет е от ${bg.dnevnitapet.sources.SourceRegistry.name(current.candidate.sourceId)}:\n${current.candidate.title}"
+            },
+        )
+    }
+
     /** Called when the app comes to the foreground: catch up on a missed change, refill the queue. */
     fun onResume() {
+        checkWelcome()
         if (installAfterPermission && graph.updater.canInstall()) {
             installAfterPermission = false
             installUpdate()
@@ -391,7 +447,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startOnboarding() {
         viewModelScope.launch {
-            graph.settings.update { it.copy(onboarded = true) }
+            val today = java.time.LocalDate.now().toString()
+            graph.settings.update { it.copy(onboarded = true, greetedDay = today, lastSeenVersion = bg.dnevnitapet.BuildConfig.VERSION_NAME) }
             // Show the wallpaper that is about to be set, not whatever page the gallery was on.
             _previewKey.value = null
             next()
