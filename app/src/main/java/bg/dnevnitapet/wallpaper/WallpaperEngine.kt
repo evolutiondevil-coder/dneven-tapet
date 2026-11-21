@@ -190,12 +190,20 @@ class WallpaperEngine(
         st.current?.takeIf { it.key == c.key }?.let { return ChangeResult.Changed(it) }
         if (st.queue.any { it.key == c.key }) return chooseFromQueue(c.key)
         (st.history + st.favorites).firstOrNull { it.key == c.key && File(it.file).exists() }?.let { return applyStored(it) }
-        val prepared = try {
-            withContext(Dispatchers.IO) { prepare(c, relaxed = relaxed) }
-        } catch (e: Exception) {
-            log(tr("Снимка от архива не се изтегли: {0}", describe(e)))
-            return ChangeResult.Failed(tr("Не успях да изтегля снимката – провери връзката"))
+        // Paintings: the largest size first, a smaller one if the museum does not give it.
+        val attempts = if (relaxed) c.variants.sortedByDescending { it.width }.map { c.copy(variants = listOf(it)) } else listOf(c)
+        var prepared: StoredImage? = null
+        for (attempt in attempts) {
+            prepared = try {
+                withContext(Dispatchers.IO) { prepare(attempt, relaxed = relaxed) }
+            } catch (e: Exception) {
+                bg.dnevnitapet.util.Diag.i("download ${attempt.variants.firstOrNull()?.url} failed: ${describe(e)}")
+                log(tr("Снимка от архива не се изтегли: {0}", describe(e)))
+                null
+            }
+            if (prepared != null) break
         }
+        if (prepared == null) return ChangeResult.Failed(tr("Не успях да изтегля снимката – провери връзката"))
         return changeMutex.withLock {
             withContext(Dispatchers.IO) {
                 try {

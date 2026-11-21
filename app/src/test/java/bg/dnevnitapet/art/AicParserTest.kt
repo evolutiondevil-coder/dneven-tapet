@@ -29,7 +29,7 @@ class AicParserTest {
         assertEquals("https://www.artic.edu/iiif/2/25c31d8d-21a4-9ea1-1d73-6a2eca4dda7e/full/843,/0/default.jpg", a.imageUrl)
         val c = a.candidate()
         assertEquals("art:aic:28560", c.key)
-        assertEquals(1686, c.variants.single().width)
-        assertEquals(1336, c.variants.single().height)
+        assertEquals(listOf(1686, 843), c.variants.map { it.width })
+        assertEquals(1336, c.variants.first().height)
     }
 }

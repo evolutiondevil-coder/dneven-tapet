@@ -2,6 +2,7 @@ package bg.dnevnitapet.art
 
 import android.content.Context
 import bg.dnevnitapet.data.JsonFileStore
+import bg.dnevnitapet.i18n.tr
 import bg.dnevnitapet.model.Candidate
 import bg.dnevnitapet.model.ImageVariant
 import bg.dnevnitapet.net.Http
@@ -43,13 +44,10 @@ data class Artwork(
         author = listOf(artist, date).filter { it.isNotBlank() }.joinToString(", "),
         copyright = "Public domain · Art Institute of Chicago",
         infoUrl = pageUrl,
-        variants = listOf(
-            ImageVariant(
-                "https://www.artic.edu/iiif/2/$imageId/full/1686,/0/default.jpg",
-                1686,
-                if (width > 0) (height.toLong() * 1686 / width).toInt() else 0,
-            ),
-        ),
+        // The museum serves 843 px to everyone; 1686 px is tried first (sharper on the screen).
+        variants = listOf(1686, 843).map { w ->
+            ImageVariant("https://www.artic.edu/iiif/2/$imageId/full/$w,/0/default.jpg", w, if (width > 0) (height.toLong() * w / width).toInt() else 0)
+        },
     )
 
     companion object {
@@ -72,7 +70,8 @@ object AicParser {
             Artwork(
                 id = o.int("id") ?: return@mapNotNull null,
                 title = Text.decodeEntities(o.str("title").orEmpty()).trim(),
-                artist = o.str("artist_display").orEmpty().lineSequence().firstOrNull().orEmpty().trim(),
+                // "Vincent van Gogh\nDutch, 1853–1890" or "Pierre-Auguste Renoir (French, 1841–1919)": the name only.
+                artist = o.str("artist_display").orEmpty().lineSequence().firstOrNull().orEmpty().substringBefore(" (").trim(),
                 date = o.str("date_display").orEmpty().trim(),
                 imageId = imageId,
                 width = o.child("thumbnail").int("width") ?: 0,

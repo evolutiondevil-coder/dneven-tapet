@@ -423,6 +423,13 @@ class WallpaperChangeTest {
         val art = graph.art.next()
         Log.i(TAG, "art: $art")
         assertTrue("no painting", art != null)
+        // How the museum answers (logged to see what works on this network).
+        for (w in listOf(843, 1686)) {
+            val f = java.io.File(context.cacheDir, "art-$w.jpg")
+            val r = runCatching { graph.http.downloadImage("https://www.artic.edu/iiif/2/${art!!.imageId}/full/$w,/0/default.jpg", f) }
+            Log.i(TAG, "art $w px: ${r.exceptionOrNull() ?: "${f.length()} bytes"}")
+            f.delete()
+        }
         val r = graph.engine.applyCandidate(art!!.candidate(), relaxed = true)
         Log.i(TAG, "art as wallpaper: $r")
         assertTrue("painting not set: $r", r is ChangeResult.Changed)
