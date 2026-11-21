@@ -10,7 +10,8 @@ mkdir -p "$OUT"
 adb logcat -c || true
 
 # No adb command may hang the job: each gets at most 90 seconds (a hang shows up as a failed step).
-adb() { timeout 90 command adb "$@"; }
+ADB_BIN=$(command -v adb)
+adb() { timeout 90 "$ADB_BIN" "$@"; }
 
 shot() { sleep "${2:-3}"; echo "== $1"; adb exec-out screencap -p > "$OUT/$1.png"; }
 
