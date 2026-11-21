@@ -17,104 +17,151 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import java.io.File
+import java.net.URLEncoder
 
-/** A famous painting in the public domain (Art Institute of Chicago). */
+/** A famous painting in the public domain (Wikimedia Commons' featured paintings). */
 @Serializable
 data class Artwork(
-    val id: Int,
+    /** The file's page title on Wikimedia Commons, e.g. "File:Vincent van Gogh - The Starry Night.jpg". */
+    val id: String,
     val title: String,
     val artist: String,
     val date: String,
-    val imageId: String,
+    /** About 1280 px wide, for the screen. */
+    val imageUrl: String,
+    /** The largest rendition (up to 3840 px) for the wallpaper. */
+    val fullUrl: String,
     val width: Int,
     val height: Int,
     val story: String,
+    val pageUrl: String,
 ) {
-    /** The painting for the screen (843 px wide, the size the museum recommends). */
-    val imageUrl: String get() = "https://www.artic.edu/iiif/2/$imageId/full/843,/0/default.jpg"
-
-    val pageUrl: String get() = "https://www.artic.edu/artworks/$id"
-
-    /** As a picture of the app ("Сложи за тапет"): the largest size the museum serves for everyone. */
+    /** As a picture of the app ("Сложи за тапет"): the largest rendition, the screen one as a fallback. */
     fun candidate() = Candidate(
-        key = "art:aic:$id",
+        key = "art:" + id.removePrefix("File:").replace(' ', '_'),
         sourceId = SOURCE_ID,
         title = title,
         description = story,
         author = listOf(artist, date).filter { it.isNotBlank() }.joinToString(", "),
-        copyright = "Public domain · Art Institute of Chicago",
+        copyright = "Public domain · Wikimedia Commons",
         infoUrl = pageUrl,
-        // The museum serves 843 px to everyone; 1686 px is tried first (sharper on the screen).
-        variants = listOf(1686, 843).map { w ->
-            ImageVariant("https://www.artic.edu/iiif/2/$imageId/full/$w,/0/default.jpg", w, if (width > 0) (height.toLong() * w / width).toInt() else 0)
-        },
+        variants = listOf(
+            ImageVariant(fullUrl, width, height),
+            ImageVariant(imageUrl, 1280, if (width > 0) (height.toLong() * 1280 / width).toInt() else 0),
+        ).distinctBy { it.url },
     )
 
     companion object {
         const val SOURCE_ID = "art"
-        val MUSEUM: String get() = tr("Институт по изкуствата, Чикаго")
+        val MUSEUM: String get() = "Wikimedia Commons"
     }
 }
 
-/** Reads the museum's search answer. Pure logic, unit-tested. */
-object AicParser {
-    fun parse(json: String): List<Artwork> {
-        val data = parseJson(json).obj()?.get("data").arr() ?: return emptyList()
-        return data.mapNotNull { el ->
-            val o = el.obj() ?: return@mapNotNull null
-            if (o["is_public_domain"]?.toString() != "true") return@mapNotNull null
-            if (o.str("classification_title")?.lowercase()?.contains("painting") != true) return@mapNotNull null
-            val imageId = o.str("image_id")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val story = o.str("short_description")?.takeIf { it.isNotBlank() }
-                ?: o.str("description")?.let(Text::stripHtml).orEmpty()
+/** Reads the featured paintings of Wikimedia Commons (MediaWiki API). Pure logic, unit-tested. */
+object CommonsArtParser {
+    private const val API = "https://commons.wikimedia.org/w/api.php"
+    private val px = Regex("/\\d+px-")
+
+    /** Categories tried in this order (the first that answers with paintings is used). */
+    val categories = listOf("Category:Featured_pictures_of_paintings", "Category:Quality_images_of_paintings")
+
+    fun url(category: String, cont: String?): String =
+        "$API?action=query&format=json&formatversion=2&generator=categorymembers&gcmtype=file&gcmlimit=30" +
+            "&gcmtitle=" + enc(category) + (if (cont != null) "&gcmcontinue=" + enc(cont) else "") +
+            "&prop=imageinfo&iiprop=" + enc("url|size|mime|extmetadata") + "&iiurlwidth=3840" +
+            "&iiextmetadatafilter=" + enc("ImageDescription|Artist|ObjectName|DateTimeOriginal|LicenseShortName") +
+            "&iiextmetadatalanguage=en"
+
+    /** @return the paintings and where the list goes on (null at its end). */
+    fun parse(json: String): Pair<List<Artwork>, String?> {
+        val root = parseJson(json).obj() ?: return emptyList<Artwork>() to null
+        val cont = root.child("continue").str("gcmcontinue")
+        val pages = root.child("query")?.get("pages").arr() ?: return emptyList<Artwork>() to cont
+        val list = pages.mapNotNull { el ->
+            val page = el.obj() ?: return@mapNotNull null
+            val title = page.str("title") ?: return@mapNotNull null
+            val ii = page["imageinfo"].arr()?.firstOrNull().obj() ?: return@mapNotNull null
+            val meta = ii.child("extmetadata")
+            fun value(name: String) = Text.stripHtml(meta.child(name).str("value").orEmpty()).trim()
+            if (!value("LicenseShortName").lowercase().contains("public domain")) return@mapNotNull null
+            val mime = ii.str("mime").orEmpty()
+            val width = ii.int("width") ?: 0
+            val height = ii.int("height") ?: 0
+            if (width < 1200 || height < 900) return@mapNotNull null
+            val original = ii.str("url") ?: return@mapNotNull null
+            val thumb = ii.str("thumburl")
+            val raster = mime == "image/jpeg" || mime == "image/png"
+            val full = if (width > 3840 || !raster) thumb ?: return@mapNotNull null else original
+            val fullW = if (full == original) width else (ii.int("thumbwidth") ?: 3840)
+            val fullH = if (full == original) height else (ii.int("thumbheight") ?: (height.toLong() * fullW / width).toInt())
+            val screen = when {
+                thumb != null && px.containsMatchIn(thumb) -> thumb.replace(px, "/1280px-")
+                raster && width > 1280 && "/commons/" in original -> thumbOf(original, 1280)
+                else -> full
+            }
+            val fileName = title.removePrefix("File:").substringBeforeLast('.').replace(" - Google Art Project", "").trim()
             Artwork(
-                id = o.int("id") ?: return@mapNotNull null,
-                title = Text.decodeEntities(o.str("title").orEmpty()).trim(),
-                // "Vincent van Gogh\nDutch, 1853–1890" or "Pierre-Auguste Renoir (French, 1841–1919)": the name only.
-                artist = o.str("artist_display").orEmpty().lineSequence().firstOrNull().orEmpty().substringBefore(" (").trim(),
-                date = o.str("date_display").orEmpty().trim(),
-                imageId = imageId,
-                width = o.child("thumbnail").int("width") ?: 0,
-                height = o.child("thumbnail").int("height") ?: 0,
-                story = Text.clip(Text.stripHtml(story), 700),
+                id = title,
+                title = Text.clip(value("ObjectName").lineSequence().firstOrNull().orEmpty().ifBlank { fileName }, 120),
+                artist = Text.clip(value("Artist").lineSequence().firstOrNull().orEmpty().substringBefore(" (").trim(), 80),
+                date = Text.clip(value("DateTimeOriginal").lineSequence().firstOrNull().orEmpty(), 40),
+                imageUrl = screen,
+                fullUrl = full,
+                width = fullW,
+                height = fullH,
+                story = Text.clip(value("ImageDescription"), 700),
+                pageUrl = ii.str("descriptionurl").orEmpty(),
             )
         }
+        return list to cont
     }
 
-    fun url(page: Int) =
-        "https://api.artic.edu/api/v1/artworks/search?query%5Bterm%5D%5Bis_boosted%5D=true" +
-            "&fields=id,title,artist_display,date_display,image_id,is_public_domain,classification_title,short_description,description,thumbnail" +
-            "&limit=40&page=$page"
+    /** "…/commons/a/ab/Name.jpg" → "…/commons/thumb/a/ab/Name.jpg/1280px-Name.jpg". */
+    fun thumbOf(original: String, width: Int): String {
+        val name = original.substringAfterLast('/')
+        return original.replace("/commons/", "/commons/thumb/") + "/${width}px-$name"
+    }
+
+    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 }
 
 @Serializable
-data class ArtState(val pool: List<Artwork> = emptyList(), val shown: List<Int> = emptyList(), val page: Int = 1)
+data class ArtState(
+    val pool: List<Artwork> = emptyList(),
+    val shown: List<String> = emptyList(),
+    /** Which category and where its list goes on. */
+    val category: Int = 0,
+    val cont: String? = null,
+)
 
 /** "Пауза за изкуство": famous paintings, each shown once, a few fetched at a time. */
 class ArtCollection(context: Context, private val http: Http) {
-    private val store = JsonFileStore(File(context.filesDir, "art.json"), ArtState.serializer()) { ArtState() }
+    private val store = JsonFileStore(File(context.filesDir, "art-commons.json"), ArtState.serializer()) { ArtState() }
     private val mutex = Mutex()
 
-    /** The next painting not shown yet (fetches more from the museum when few are left). */
+    /** The next painting not shown yet (fetches more when few are left). */
     suspend fun next(): Artwork? = mutex.withLock {
         var st = store.value
         var tries = 0
-        while (st.pool.count { it.id !in st.shown } < 3 && tries < 3) {
+        while (st.pool.count { it.id !in st.shown } < 3 && tries < 4) {
             tries++
-            val page = st.page
-            val fetched = runCatching { AicParser.parse(http.getText(AicParser.url(page))) }.getOrNull() ?: break
+            val category = CommonsArtParser.categories.getOrElse(st.category) { CommonsArtParser.categories.first() }
+            val (fetched, cont) = runCatching { CommonsArtParser.parse(http.getText(CommonsArtParser.url(category, st.cont))) }.getOrNull() ?: break
             st = store.update { s ->
                 val known = s.pool.map { it.id }.toSet()
-                // After the last page the museum's list starts again.
-                s.copy(pool = (s.pool + fetched.filter { it.id !in known }).takeLast(120), page = if (fetched.isEmpty()) 1 else page + 1)
+                when {
+                    // This category has nothing usable: the next one.
+                    fetched.isEmpty() && s.cont == null -> s.copy(category = (s.category + 1) % CommonsArtParser.categories.size)
+                    // At the end of the list it starts again.
+                    else -> s.copy(pool = (s.pool + fetched.filter { it.id !in known }).takeLast(150), cont = cont)
+                }
             }
-            if (fetched.isEmpty() && page == 1) break
         }
         val unseen = st.pool.filter { it.id !in st.shown }
         unseen.firstOrNull() ?: st.pool.firstOrNull()?.also { store.update { s -> s.copy(shown = emptyList()) } }
     }
 
-    suspend fun markShown(id: Int) {
+    suspend fun markShown(id: String) {
         store.update { it.copy(shown = (it.shown + id).distinct().takeLast(400)) }
     }
 }

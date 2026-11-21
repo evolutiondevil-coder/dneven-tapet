@@ -26,7 +26,18 @@ import bg.dnevnitapet.i18n.AppLanguage
 import bg.dnevnitapet.i18n.I18n
 import bg.dnevnitapet.i18n.tr
 
-class App : Application() {
+class App : Application(), coil.ImageLoaderFactory {
+    /** Pictures shown straight from the internet (archive, paintings) say who asks, as Wikimedia wants. */
+    override fun newImageLoader(): coil.ImageLoader = coil.ImageLoader.Builder(this)
+        .okHttpClient {
+            okhttp3.OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    chain.proceed(chain.request().newBuilder().header("User-Agent", bg.dnevnitapet.net.OkHttpHttp.USER_AGENT).build())
+                }
+                .build()
+        }
+        .build()
+
     lateinit var graph: AppGraph
         private set
 
