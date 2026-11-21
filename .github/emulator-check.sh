@@ -179,6 +179,14 @@ after_widget=$(wallpaper_state)
   echo "wallpaper after widget:  $after_widget"
 } | tee -a "$OUT/summary.txt"
 
+# Opening the app again after a while: the picture settles in and a short phrase shows.
+adb shell input keyevent KEYCODE_HOME
+sleep 25
+adb shell am start -n bg.dnevnitapet/.ui.MainActivity
+shot 16-open-greeting 1
+shot 16b-after-open 3
+if has_text "Следваща"; then echo "OK: main screen is back after the opening greeting"; else echo "FAIL: main screen after the opening greeting"; fi | tee -a "$OUT/summary.txt"
+
 # The signed release APK (the file people install): set up and choose a picture.
 REL=$(ls release-apk/*.apk 2>/dev/null | head -n 1)
 if [ -n "$REL" ]; then

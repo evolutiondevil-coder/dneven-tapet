@@ -155,6 +155,8 @@ data class Settings(
     val lastSeenVersion: String = "",
     /** yyyy-MM-dd of the last morning greeting ("Добро утро"), shown once a day. */
     val greetedDay: String = "",
+    /** Every opening of the app: the picture settles in and a short phrase appears ("Здравей отново"). */
+    val openGreeting: Boolean = true,
     val frequency: FrequencyMode = FrequencyMode.DAILY,
     /** Minutes after midnight for the daily change. */
     val dailyMinuteOfDay: Int = 5 * 60,

@@ -7,6 +7,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -91,6 +95,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -115,11 +120,15 @@ import bg.dnevnitapet.util.Power
 import bg.dnevnitapet.wallpaper.MyPhotos
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.math.abs
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Main screen: the pictures as a swipeable gallery (history ← current wallpaper → upcoming),
@@ -136,6 +145,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val loadingMore by vm.loadingMore.collectAsStateWithLifecycle()
     val previewKey by vm.previewKey.collectAsStateWithLifecycle()
     val browseOnline by vm.browseOnline.collectAsStateWithLifecycle()
+    val entrance by vm.entrance.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -154,6 +164,43 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             val r = snackbar.showSnackbar(m.text, actionLabel = m.actionLabel, withDismissAction = m.actionLabel == null)
             if (r == SnackbarResult.ActionPerformed) m.action?.invoke()
         }
+    }
+
+    // Every opening: the picture settles in (zooms out a little), the controls rise from below and
+    // a short phrase shows for a moment. Starts in the "before" state so nothing flashes first.
+    val entering = vm.entrance.value != null
+    val pictureScale = remember { Animatable(if (entering) ENTRANCE_ZOOM else 1f) }
+    val controlsIn = remember { Animatable(if (entering) 0f else 1f) }
+    val phraseAlpha = remember { Animatable(0f) }
+    var phrase by remember { mutableStateOf("") }
+    LaunchedEffect(entrance?.id) {
+        val e = entrance ?: return@LaunchedEffect
+        phrase = e.phrase
+        try {
+            pictureScale.snapTo(ENTRANCE_ZOOM)
+            controlsIn.snapTo(0f)
+            phraseAlpha.snapTo(0f)
+            coroutineScope {
+                launch { pictureScale.animateTo(1f, tween(1400, easing = CubicBezierEasing(0.2f, 0.7f, 0.2f, 1f))) }
+                launch {
+                    delay(if (e.phrase.isEmpty()) 150L else 900L)
+                    controlsIn.animateTo(1f, tween(550, easing = FastOutSlowInEasing))
+                }
+                if (e.phrase.isNotEmpty()) {
+                    phraseAlpha.animateTo(1f, tween(350))
+                    delay(650)
+                    phraseAlpha.animateTo(0f, tween(450))
+                }
+            }
+        } finally {
+            // Interrupted or done: everything in its normal place.
+            withContext(NonCancellable) {
+                pictureScale.snapTo(1f)
+                controlsIn.snapTo(1f)
+                phraseAlpha.snapTo(0f)
+            }
+        }
+        vm.entranceDone()
     }
 
     val current = st.current
@@ -231,7 +278,10 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     Box(Modifier.fillMaxSize().background(Color(0xFF101418))) {
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                scaleX = pictureScale.value
+                scaleY = pictureScale.value
+            },
             beyondViewportPageCount = 1,
             key = { p -> latestList.getOrNull(p)?.key ?: "loading-${latestList.size}" },
         ) { p ->
@@ -258,7 +308,12 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         }
 
         AnimatedVisibility(visible = !immersive, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    alpha = controlsIn.value
+                    translationY = (1f - controlsIn.value) * 28.dp.toPx()
+                },
+            ) {
                 // Light scrims only behind the text: most of the picture stays clear (they do not block swipes or taps).
                 Box(
                     Modifier.fillMaxWidth().height(110.dp)
@@ -503,6 +558,18 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             }
         }
 
+        if (phraseAlpha.value > 0f && phrase.isNotEmpty()) {
+            Text(
+                phrase,
+                color = Color.White,
+                style = MaterialTheme.typography.displaySmall.copy(shadow = Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 2f), 16f)),
+                fontWeight = FontWeight.Light,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 24.dp).padding(bottom = 80.dp)
+                    .graphicsLayer { alpha = phraseAlpha.value },
+            )
+        }
+
         // First start: four short pages about the app.
         if (!settings.onboarded) {
             WelcomeScreen(unrestricted, busy, onAllow = { Power.requestUnrestricted(context) }, onStart = vm::startOnboarding)
@@ -722,3 +789,6 @@ private fun SwitchPart(text: String, selected: Boolean, onClick: () -> Unit) {
         )
     }
 }
+
+/** How much bigger the picture starts when the app opens (it settles to normal size). */
+private const val ENTRANCE_ZOOM = 1.12f

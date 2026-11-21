@@ -179,6 +179,32 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun closeGreeting() {
         _greeting.value = null
+        // The morning greeting already said hello: the main screen only settles in.
+        if (settings.value.openGreeting) _entrance.value = Entrance(System.currentTimeMillis(), "")
+    }
+
+    /** One opening of the app: the picture settles in, the controls rise, [phrase] shows for a moment ("" = none). */
+    data class Entrance(val id: Long, val phrase: String)
+
+    private val _entrance = MutableStateFlow<Entrance?>(null)
+    val entrance: StateFlow<Entrance?> = _entrance.asStateFlow()
+    private var lastPhrase: String? = null
+    private var resumedBefore = false
+
+    fun entranceDone() {
+        _entrance.value = null
+    }
+
+    /** Every opening (start, or back after a while): the entrance, unless a bigger greeting is shown. */
+    private fun checkEntrance() {
+        val now = System.currentTimeMillis()
+        val opened = !resumedBefore || (pausedAt > 0 && now - pausedAt > OPEN_GAP_MS)
+        resumedBefore = true
+        val s = settings.value
+        if (!opened || !s.onboarded || !s.openGreeting || _greeting.value != null || _whatsNew.value.isNotEmpty()) return
+        val phrase = Greeting.openPhrase(java.time.LocalDateTime.now(), lastPhrase)
+        lastPhrase = phrase
+        _entrance.value = Entrance(now, phrase)
     }
 
     /** After an update "Какво ново" (once); otherwise, on the first opening of the day, the greeting. */
@@ -216,6 +242,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Called when the app comes to the foreground: catch up on a missed change, refill the queue. */
     fun onResume() {
         checkWelcome()
+        checkEntrance()
         if (installAfterPermission && graph.updater.canInstall()) {
             installAfterPermission = false
             installUpdate()
@@ -679,5 +706,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         /** How many pictures ahead are prepared while browsing. */
         private const val PREFETCH_AHEAD = 4
+
+        /** Back in the app after at least this long counts as a new opening (the entrance plays). */
+        private const val OPEN_GAP_MS = 20_000L
     }
 }

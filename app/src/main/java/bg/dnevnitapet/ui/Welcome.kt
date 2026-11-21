@@ -75,6 +75,32 @@ object Greeting {
     /** "Петък, 20 ноември". */
     fun date(day: LocalDate): String =
         day.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale("bg"))).replaceFirstChar { it.uppercase() }
+
+    /** The short phrases for opening the app at [time]: by the time of day, the day of the week, and general ones. */
+    fun openPhrases(time: java.time.LocalDateTime): List<String> {
+        val byTime = when (time.hour) {
+            in 5..10 -> listOf("Добро утро", "Приятна сутрин")
+            in 11..17 -> listOf("Добър ден", "Хубав ден")
+            in 18..21 -> listOf("Добър вечер", "Хубава вечер")
+            else -> listOf("Тиха нощ", "Спокойна нощ")
+        }
+        val day = when (time.dayOfWeek!!) {
+            java.time.DayOfWeek.MONDAY -> "Приятен понеделник"
+            java.time.DayOfWeek.TUESDAY -> "Приятен вторник"
+            java.time.DayOfWeek.WEDNESDAY -> "Приятна сряда"
+            java.time.DayOfWeek.THURSDAY -> "Приятен четвъртък"
+            java.time.DayOfWeek.FRIDAY -> "Приятен петък"
+            java.time.DayOfWeek.SATURDAY -> "Приятна събота"
+            java.time.DayOfWeek.SUNDAY -> "Приятна неделя"
+        }
+        // At night the day's wish sounds odd.
+        val days = if (time.hour in 5..21) listOf(day) else emptyList()
+        return byTime + days + listOf("Здравей отново", "Радвам се да те видя")
+    }
+
+    /** One phrase for this opening, never the same as the last one. */
+    fun openPhrase(time: java.time.LocalDateTime, last: String?, random: kotlin.random.Random = kotlin.random.Random.Default): String =
+        openPhrases(time).filter { it != last }.random(random)
 }
 
 private class WelcomePage(val icon: ImageVector, val title: String, val text: String)

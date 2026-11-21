@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Image
@@ -315,6 +316,10 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         if (problems == 0) "✓ Всичко е наред" else "⚠ $problems ${if (problems == 1) "нещо за настройка" else "неща за настройка"}",
                         first = true,
                     ) { sheet = Sheet.RELIABILITY }
+                    ToggleRow(
+                        Icons.Outlined.AutoAwesome, Tint.BLUE, "Поздрав при отваряне",
+                        "Снимката се появява плавно с кратка фраза", s.openGreeting,
+                    ) { v -> update { it.copy(openGreeting = v) } }
                     LinkRow(Icons.Outlined.Storage, Tint.GRAY, "Памет", "${Format.megabytes(cache)} · готови снимки: ${st.queue.size}") { sheet = Sheet.MEMORY }
                     LinkRow(
                         Icons.Outlined.Info, Tint.GRAY, "За приложението",
