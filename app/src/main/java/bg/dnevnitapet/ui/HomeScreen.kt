@@ -180,16 +180,20 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             pictureScale.snapTo(ENTRANCE_ZOOM)
             controlsIn.snapTo(0f)
             phraseAlpha.snapTo(0f)
+            // With a phrase about 4 seconds in all (a tap ends it); after the morning greeting only the motion.
+            val withPhrase = e.phrase.isNotEmpty()
             coroutineScope {
-                launch { pictureScale.animateTo(1f, tween(1400, easing = CubicBezierEasing(0.2f, 0.7f, 0.2f, 1f))) }
                 launch {
-                    delay(if (e.phrase.isEmpty()) 150L else 900L)
-                    controlsIn.animateTo(1f, tween(550, easing = FastOutSlowInEasing))
+                    pictureScale.animateTo(1f, tween(if (withPhrase) 3200 else 1400, easing = CubicBezierEasing(0.2f, 0.7f, 0.2f, 1f)))
                 }
-                if (e.phrase.isNotEmpty()) {
-                    phraseAlpha.animateTo(1f, tween(350))
-                    delay(650)
-                    phraseAlpha.animateTo(0f, tween(450))
+                launch {
+                    delay(if (withPhrase) 3300L else 150L)
+                    controlsIn.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+                }
+                if (withPhrase) {
+                    phraseAlpha.animateTo(1f, tween(450))
+                    delay(2850)
+                    phraseAlpha.animateTo(0f, tween(600))
                 }
             }
         } finally {
@@ -558,6 +562,14 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             }
         }
 
+        // While the opening greeting plays, a tap anywhere ends it at once.
+        if (entrance != null) {
+            Box(
+                Modifier.fillMaxSize().pointerInput(Unit) {
+                    detectTapGestures(onTap = { vm.entranceDone() })
+                },
+            )
+        }
         if (phraseAlpha.value > 0f && phrase.isNotEmpty()) {
             Text(
                 phrase,
@@ -776,8 +788,8 @@ private fun SwitchPart(text: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50),
-        color = if (selected) Color.White else Color.Transparent,
-        contentColor = if (selected) Color.Black else Color.White,
+        color = if (selected) SelectedOrange else Color.Transparent,
+        contentColor = if (selected) OnSelectedOrange else Color.White,
         modifier = Modifier.semantics { this.selected = selected },
     ) {
         Text(

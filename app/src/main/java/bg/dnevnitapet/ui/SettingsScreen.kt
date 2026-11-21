@@ -61,7 +61,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -181,7 +180,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                                 )
                             }
                             Spacer(Modifier.width(12.dp))
-                            Switch(checked = s.autoChange, onCheckedChange = { v -> update { it.copy(autoChange = v) } })
+                            Switch(checked = s.autoChange, colors = choiceSwitchColors(), onCheckedChange = { v -> update { it.copy(autoChange = v) } })
                         }
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -253,7 +252,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     if (s.panorama) {
                         ChipLine {
                             listOf(1.5f to "1,5 екрана", 2f to "2 екрана", 3f to "3 екрана").forEach { (w, label) ->
-                                FilterChip(selected = s.panoramaScreens == w, enabled = !busy, onClick = { update { it.copy(panoramaScreens = w) } }, label = { Text(label) })
+                                ChoiceChip(selected = s.panoramaScreens == w, enabled = !busy, onClick = { update { it.copy(panoramaScreens = w) } }, label = { Text(label) })
                             }
                         }
                     }
@@ -266,8 +265,8 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     ) { v -> vm.setLiveOption({ it.copy(readableIcons = if (v) ReadableMode.DIM else ReadableMode.OFF) }, askLive) }
                     if (s.readableIcons != ReadableMode.OFF) {
                         ChipLine {
-                            FilterChip(selected = s.readableIcons == ReadableMode.DIM, onClick = { update { it.copy(readableIcons = ReadableMode.DIM) } }, label = { Text("Затъмни") })
-                            FilterChip(selected = s.readableIcons == ReadableMode.DIM_BLUR, onClick = { update { it.copy(readableIcons = ReadableMode.DIM_BLUR) } }, label = { Text("Затъмни и размажи") })
+                            ChoiceChip(selected = s.readableIcons == ReadableMode.DIM, onClick = { update { it.copy(readableIcons = ReadableMode.DIM) } }, label = { Text("Затъмни") })
+                            ChoiceChip(selected = s.readableIcons == ReadableMode.DIM_BLUR, onClick = { update { it.copy(readableIcons = ReadableMode.DIM_BLUR) } }, label = { Text("Затъмни и размажи") })
                         }
                     }
                     ToggleRow(Icons.Outlined.DarkMode, Tint.PURPLE, "Вечер по-тъмно", "От 19:30 до 07:00, за да не блести", s.eveningDim) { v ->
@@ -367,7 +366,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(Modifier.padding(start = 48.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(1, 2, 3, 7, 14).forEach { d ->
-                                FilterChip(selected = s.everyDays == d, onClick = { update { it.copy(everyDays = d) } }, label = { Text(if (d == 1) "1 ден" else "$d дни") })
+                                ChoiceChip(selected = s.everyDays == d, onClick = { update { it.copy(everyDays = d) } }, label = { Text(if (d == 1) "1 ден" else "$d дни") })
                             }
                         }
                     }
@@ -376,7 +375,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         @OptIn(ExperimentalLayoutApi::class)
                         FlowRow(Modifier.padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(1, 2, 3, 6, 12).forEach { h ->
-                                FilterChip(selected = s.intervalHours == h, onClick = { update { it.copy(intervalHours = h) } }, label = { Text(if (h == 1) "1 час" else "$h часа") })
+                                ChoiceChip(selected = s.intervalHours == h, onClick = { update { it.copy(intervalHours = h) } }, label = { Text(if (h == 1) "1 час" else "$h часа") })
                             }
                         }
                     }
@@ -417,7 +416,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Category.entries.forEach { c ->
-                            FilterChip(
+                            ChoiceChip(
                                 selected = c in s.enabledCategories,
                                 onClick = {
                                     update {
@@ -676,7 +675,7 @@ private fun ToggleRow(icon: ImageVector, tint: Tint, title: String, subtitle: St
         Spacer(Modifier.width(14.dp))
         RowTexts(title, subtitle, Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        Switch(checked = checked, onCheckedChange = null)
+        Switch(checked = checked, colors = choiceSwitchColors(), onCheckedChange = null)
     }
 }
 
@@ -744,7 +743,7 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, colors = choiceSwitchColors(), onCheckedChange = onChange)
     }
 }
 
@@ -754,7 +753,7 @@ private fun RadioRow(text: String, selected: Boolean, onClick: () -> Unit) {
         Modifier.fillMaxWidth().selectable(selected = selected, onClick = onClick, role = Role.RadioButton).padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(12.dp))
+        RadioButton(selected = selected, onClick = null, colors = choiceRadioColors(), modifier = Modifier.padding(12.dp))
         Text(text, style = MaterialTheme.typography.bodyLarge)
     }
 }
@@ -781,7 +780,7 @@ private fun SourceRow(name: String, enabled: Boolean, configured: Boolean, statu
                 color = if (statusText.startsWith("⚠")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = enabled && configured, enabled = configured, onCheckedChange = onChange)
+        Switch(checked = enabled && configured, enabled = configured, colors = choiceSwitchColors(), onCheckedChange = onChange)
     }
 }
 

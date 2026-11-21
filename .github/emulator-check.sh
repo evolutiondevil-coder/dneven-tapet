@@ -182,10 +182,18 @@ after_widget=$(wallpaper_state)
 # Opening the app again after a while: the picture settles in and a short phrase shows.
 adb shell input keyevent KEYCODE_HOME
 sleep 25
-adb shell am start -n bg.dnevnitapet/.ui.MainActivity
+adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
 shot 16-open-greeting 1
-shot 16b-after-open 3
+shot 16b-after-open 4
 if has_text "Следваща"; then echo "OK: main screen is back after the opening greeting"; else echo "FAIL: main screen after the opening greeting"; fi | tee -a "$OUT/summary.txt"
+# A tap ends the greeting at once (if it had ended already, the tap would hide the controls instead).
+adb shell input keyevent KEYCODE_HOME
+sleep 25
+adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
+sleep 1
+adb shell input tap 540 1000
+shot 16c-greeting-skipped 1
+if has_text "Следваща"; then echo "OK: a tap ends the opening greeting"; else echo "FAIL: tap during the opening greeting"; fi | tee -a "$OUT/summary.txt"
 
 # The signed release APK (the file people install): set up and choose a picture.
 REL=$(ls release-apk/*.apk 2>/dev/null | head -n 1)

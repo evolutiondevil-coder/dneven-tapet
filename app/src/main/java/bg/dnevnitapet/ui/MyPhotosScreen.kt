@@ -279,7 +279,7 @@ private fun ModeRow(title: String, subtitle: String, selected: Boolean, onClick:
         Modifier.fillMaxWidth().selectable(selected = selected, onClick = onClick, role = Role.RadioButton).padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = null, modifier = Modifier.padding(12.dp))
+        RadioButton(selected = selected, onClick = null, colors = choiceRadioColors(), modifier = Modifier.padding(12.dp))
         Column {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
