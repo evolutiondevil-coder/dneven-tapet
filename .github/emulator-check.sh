@@ -9,9 +9,9 @@ OUT=emulator-out
 mkdir -p "$OUT"
 adb logcat -c || true
 
-# No adb command may hang the job: each gets at most 90 seconds (a hang shows up as a failed step).
+# No adb command may hang the job: each gets at most 5 minutes (installing on Android 7 is slow).
 ADB_BIN=$(command -v adb)
-adb() { timeout 90 "$ADB_BIN" "$@"; }
+adb() { timeout 300 "$ADB_BIN" "$@"; }
 
 shot() { sleep "${2:-3}"; echo "== $1"; adb exec-out screencap -p > "$OUT/$1.png"; }
 

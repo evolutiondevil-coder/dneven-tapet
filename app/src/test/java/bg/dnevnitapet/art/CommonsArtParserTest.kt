@@ -10,7 +10,7 @@ class CommonsArtParserTest {
          "query":{"pages":[
           {"pageid":1,"title":"File:Vincent van Gogh - The Starry Night - Google Art Project.jpg","imageinfo":[{
             "url":"https://upload.wikimedia.org/wikipedia/commons/e/ea/Starry.jpg","width":12000,"height":9500,"mime":"image/jpeg",
-            "thumburl":"https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Starry.jpg/3840px-Starry.jpg","thumbwidth":3840,"thumbheight":3040,
+            "thumburl":"https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Starry.jpg/3840px-Starry.jpg?utm_source=commons.wikimedia.org&utm_campaign=x","thumbwidth":3840,"thumbheight":3040,
             "descriptionurl":"https://commons.wikimedia.org/wiki/File:Starry.jpg",
             "extmetadata":{"ObjectName":{"value":"The Starry Night"},"Artist":{"value":"<a href=\"x\">Vincent van Gogh</a> (1853–1890)"},
               "DateTimeOriginal":{"value":"1889"},"ImageDescription":{"value":"<p>The view from his window.</p>"},"LicenseShortName":{"value":"Public domain"}}}]},
@@ -38,7 +38,8 @@ class CommonsArtParserTest {
         // No title: from the file name.
         val small = list[1]
         assertEquals("Small portrait", small.title)
-        assertEquals("https://upload.wikimedia.org/wikipedia/commons/b/bb/Small_portrait.jpg", small.fullUrl)
+        // Never the original file (Wikimedia limits those): a standard 1920 px rendition.
+        assertEquals("https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Small_portrait.jpg/1920px-Small_portrait.jpg", small.fullUrl)
         assertEquals("https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/Small_portrait.jpg/1280px-Small_portrait.jpg", small.imageUrl)
         val c = starry.candidate()
         assertTrue(c.key.startsWith("art:"))
