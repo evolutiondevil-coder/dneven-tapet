@@ -42,6 +42,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // The translator's built-in parts only for phones' processors (ARM): a much smaller file.
+            // (The emulators of the tests use the debug build, which keeps all of them.)
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             // No debug-key fallback on purpose: a release signed with another key
             // could not be installed over the real one later.
             if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
@@ -68,6 +71,8 @@ android {
     sourceSets.getByName("androidTest").resources.srcDir("src/test/resources")
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Built-in parts compressed in the file (unpacked at install): a smaller download.
+        jniLibs.useLegacyPackaging = true
     }
     lint {
         checkReleaseBuilds = false

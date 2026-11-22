@@ -216,6 +216,13 @@ if [ -n "$REL" ]; then
   adb shell input keyevent KEYCODE_HOME
   adb uninstall bg.dnevnitapet > /dev/null 2>&1
   adb install "$REL"
+fi
+# The release APK is for phones (ARM); an emulator that cannot run ARM parts cannot install it.
+if [ -n "$REL" ] && ! adb shell pm list packages bg.dnevnitapet | grep -q bg.dnevnitapet; then
+  echo "SKIP: release APK is for phones (ARM) – this emulator cannot install it" | tee -a "$OUT/summary.txt"
+  REL=""
+fi
+if [ -n "$REL" ]; then
   adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
   shot 20-release-language 5
   r0=$(wallpaper_state)
