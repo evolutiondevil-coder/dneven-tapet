@@ -91,6 +91,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import bg.dnevnitapet.R
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -332,40 +336,45 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.62f)))),
                 )
 
+                // Glass capsules: the logo with the name, and each button in its own dark circle,
+                // so everything reads on any picture without darkening the top of it.
                 Row(
-                    Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                    Modifier.statusBarsPadding().fillMaxWidth().padding(start = 10.dp, end = 8.dp, top = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        tr("Дневен тапет"),
-                        color = Color.White.copy(alpha = 0.92f),
-                        style = MaterialTheme.typography.titleMedium.copy(shadow = TextShadow),
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 16.dp).weight(1f),
-                    )
-                    IconButton(onClick = { onNavigate(Screen.ARCHIVE) }) {
-                        Icon(Icons.Filled.Search, contentDescription = tr("Архив"), tint = Color.White)
+                    Surface(shape = RoundedCornerShape(50), color = GlassColor, modifier = Modifier.weight(1f, fill = false)) {
+                        Row(Modifier.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painterResource(R.mipmap.ic_launcher_background),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(32.dp).clip(CircleShape),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                tr("Дневен тапет"),
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                    IconButton(onClick = { onNavigate(Screen.HISTORY) }) {
-                        Icon(Icons.Filled.History, contentDescription = tr("История"), tint = Color.White)
-                    }
-                    IconButton(onClick = { onNavigate(Screen.MY_PHOTOS) }) {
-                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = tr("Моите снимки"), tint = Color.White)
-                    }
-                    IconButton(onClick = { onNavigate(Screen.FAVORITES) }) {
-                        Icon(Icons.Outlined.PhotoLibrary, contentDescription = tr("Любими"), tint = Color.White)
-                    }
-                    IconButton(onClick = { onNavigate(Screen.SETTINGS) }) {
-                        Icon(Icons.Filled.Settings, contentDescription = tr("Настройки"), tint = Color.White)
+                    Row(Modifier.padding(start = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        GlassButton(Icons.Filled.Search, tr("Архив")) { onNavigate(Screen.ARCHIVE) }
+                        GlassButton(Icons.Filled.History, tr("История")) { onNavigate(Screen.HISTORY) }
+                        GlassButton(Icons.Outlined.AddPhotoAlternate, tr("Моите снимки")) { onNavigate(Screen.MY_PHOTOS) }
+                        GlassButton(Icons.Outlined.PhotoLibrary, tr("Любими")) { onNavigate(Screen.FAVORITES) }
+                        GlassButton(Icons.Filled.Settings, tr("Настройки")) { onNavigate(Screen.SETTINGS) }
                     }
                 }
                 if (showSourceSwitch) {
                     SourceSwitch(
                         online = onlineView,
                         onSelect = vm::setBrowseOnline,
-                        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 56.dp),
+                        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 60.dp),
                     )
                 }
 
@@ -782,3 +791,16 @@ private fun SwitchPart(text: String, selected: Boolean, onClick: () -> Unit) {
 
 /** How much bigger the picture starts when the app opens (it settles to normal size). */
 private const val ENTRANCE_ZOOM = 1.12f
+
+/** The dark see-through colour of the glass capsules at the top. */
+private val GlassColor = Color(0xFF141418).copy(alpha = 0.45f)
+
+/** A button of the top bar: its icon in a dark see-through circle. */
+@Composable
+private fun GlassButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = CircleShape, color = GlassColor, modifier = Modifier.size(40.dp).semantics { contentDescription = description }) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+        }
+    }
+}
