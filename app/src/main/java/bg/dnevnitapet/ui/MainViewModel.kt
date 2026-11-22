@@ -150,6 +150,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val a = runCatching { graph.art.next() }.getOrNull() ?: return@launch
                 val c = a.candidate()
+                // In Bulgarian as far as possible (the language pack comes over Wi-Fi once).
+                runCatching { graph.stories.prepare() }
                 val story = runCatching { graph.stories.story(c) }.getOrNull()
                 nextArt = ArtShow(a, story?.title ?: a.title, story?.description ?: a.story)
             } finally {
@@ -190,21 +192,52 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Every picture prepared or shown, and older ones from NASA's and Wikimedia's archives. */
     val archive: StateFlow<bg.dnevnitapet.archive.ArchiveState> = graph.archive.state
 
-    private val _archiveLoading = MutableStateFlow(false)
-    val archiveLoading: StateFlow<Boolean> = _archiveLoading.asStateFlow()
+    /** "Търсене в интернет": the words, the results so far and where it stands. Nothing is stored. */
+    data class WebSearchState(
+        val query: String = "",
+        val results: List<bg.dnevnitapet.archive.WebPicture> = emptyList(),
+        val loading: Boolean = false,
+        val page: Int = 0,
+        val end: Boolean = false,
+        /** The words in English, also searched (when the Bulgarian language pack is on the phone). */
+        val english: String? = null,
+    )
 
-    /** "Още от архива": older pictures from NASA and Wikimedia (a few at a time). */
-    fun loadMoreArchive() {
-        if (_archiveLoading.value) return
-        viewModelScope.launch {
-            _archiveLoading.value = true
-            try {
-                val added = runCatching { graph.archive.loadMore(settings.value) }.getOrDefault(0)
-                if (added == 0) say(tr("Не успях да заредя още снимки – провери връзката"))
-                else graph.appScope.launch { runCatching { graph.stories.translateTitles(graph.archive.state.value.entries.map { it.candidate }.takeLast(added)) } }
-            } finally {
-                _archiveLoading.value = false
-            }
+    private val _web = MutableStateFlow(WebSearchState())
+    val web: StateFlow<WebSearchState> = _web.asStateFlow()
+    private var webJob: kotlinx.coroutines.Job? = null
+    private var webQueries: List<String> = emptyList()
+
+    /** Searches the internet for [query]; [english] = ready English words (the category chips). */
+    fun searchWeb(query: String, english: String? = null) {
+        val q = query.trim()
+        webJob?.cancel()
+        if (q.isEmpty()) {
+            _web.value = WebSearchState()
+            return
+        }
+        _web.value = WebSearchState(query = q, loading = true)
+        webJob = viewModelScope.launch {
+            val en = english ?: runCatching { graph.stories.toEnglish(q) }.getOrNull()
+            webQueries = listOfNotNull(english ?: q, en.takeIf { english == null })
+            val found = runCatching { graph.webSearch.search(webQueries, 0) }.getOrDefault(emptyList())
+            _web.value = WebSearchState(query = q, results = found, loading = false, page = 0, end = found.isEmpty(), english = en)
+            // Their titles in Bulgarian, as they come.
+            graph.appScope.launch { runCatching { graph.stories.translateTitles(found.map { it.candidate }) } }
+        }
+    }
+
+    /** The next page, when the end of the results comes into view. */
+    fun searchWebMore() {
+        val st = _web.value
+        if (st.loading || st.end || st.query.isEmpty()) return
+        _web.value = st.copy(loading = true)
+        webJob = viewModelScope.launch {
+            val more = runCatching { graph.webSearch.search(webQueries, st.page + 1) }.getOrDefault(emptyList())
+            val known = st.results.map { it.candidate.key }.toSet()
+            val fresh = more.filter { it.candidate.key !in known }
+            _web.value = _web.value.copy(results = st.results + fresh, loading = false, page = st.page + 1, end = fresh.isEmpty())
+            graph.appScope.launch { runCatching { graph.stories.translateTitles(fresh.map { it.candidate }) } }
         }
     }
 
@@ -214,7 +247,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _busy.value = true
             try {
-                val r = engine.applyCandidate(entry.candidate)
+                val r = engine.applyCandidate(entry.candidate, relaxed = true)
                 if (r is ChangeResult.Changed) {
                     _previewKey.value = null
                     scrollTo(r.image.key)
@@ -383,7 +416,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun closeGreeting() {
         _greeting.value = null
         // The morning greeting already said hello: the main screen only settles in.
-        if (settings.value.openGreeting) _entrance.value = Entrance(System.currentTimeMillis(), "")
+        _entrance.value = Entrance(System.currentTimeMillis(), "")
     }
 
     /** One opening of the app: the picture settles in, the controls rise, [phrase] shows for a moment ("" = none). */
@@ -402,7 +435,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun checkEntrance() {
         val now = System.currentTimeMillis()
         val s = settings.value
-        if (!s.onboarded || !s.openGreeting || _greeting.value != null || _whatsNew.value.isNotEmpty()) return
+        if (!s.onboarded || _greeting.value != null || _whatsNew.value.isNotEmpty()) return
         val phrase = Greeting.openPhrase(java.time.LocalDateTime.now(), lastPhrase)
         lastPhrase = phrase
         _entrance.value = Entrance(now, phrase)

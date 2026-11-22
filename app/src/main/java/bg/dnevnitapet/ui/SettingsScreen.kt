@@ -376,10 +376,6 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         if (problems == 0) tr("✓ Всичко е наред") else "⚠ $problems ${if (problems == 1) tr("нещо за настройка") else tr("неща за настройка")}",
                         first = true,
                     ) { sheet = Sheet.RELIABILITY }
-                    ToggleRow(
-                        Icons.Outlined.AutoAwesome, Tint.BLUE, tr("Поздрав при отваряне"),
-                        tr("Снимката се появява плавно с кратка фраза"), s.openGreeting,
-                    ) { v -> update { it.copy(openGreeting = v) } }
                     LinkRow(
                         Icons.Outlined.Language, Tint.BLUE, tr("Език") + " · Language", bg.dnevnitapet.i18n.I18n.language.nativeName,
                     ) { sheet = Sheet.LANGUAGE }

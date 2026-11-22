@@ -158,7 +158,12 @@ sleep 2
 tap "Моите снимки" && shot 09b-my-photos 3
 adb shell input keyevent KEYCODE_BACK
 sleep 2
-tap "Архив" && shot 09c-archive 4
+tap "Архив" && shot 09c-search 3
+# Internet search: type a word, results come from Wikimedia/NASA.
+adb shell input text "Sofia" && sleep 1 && adb shell input keyevent KEYCODE_ENTER
+shot 09d-search-results 10
+if has_text "Нищо не намерих. Опитай с друга дума или провери връзката."; then echo "FAIL: internet search found nothing for Sofia"; else echo "OK: internet search shows results"; fi | tee -a "$OUT/summary.txt"
+adb shell input keyevent KEYCODE_BACK
 adb shell input keyevent KEYCODE_BACK
 adb shell cmd uimode night yes
 shot 10-main-dark 5

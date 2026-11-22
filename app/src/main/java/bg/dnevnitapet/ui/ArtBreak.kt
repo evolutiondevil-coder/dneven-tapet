@@ -28,6 +28,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -102,6 +108,30 @@ fun ArtBreak(show: MainViewModel.ArtShow, busy: Boolean, onApply: () -> Unit, on
                 if (show.story.isNotBlank()) {
                     Text(show.story, color = Color(0xFFE2DCD3), style = MaterialTheme.typography.bodyLarge)
                 }
+                // More about the painting: its page, and an encyclopaedia article.
+                val context = LocalContext.current
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(
+                        onClick = { openLink(context, art.pageUrl) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFFB74D)),
+                    ) {
+                        Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("Повече за картината"))
+                    }
+                    TextButton(
+                        onClick = {
+                            val wiki = if (bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.BG) "bg" else "en"
+                            val q = java.net.URLEncoder.encode(listOf(show.title, art.artist).filter { it.isNotBlank() }.joinToString(" "), "UTF-8")
+                            openLink(context, "https://$wiki.wikipedia.org/w/index.php?search=$q")
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFFB74D)),
+                    ) {
+                        Icon(Icons.Outlined.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(tr("Уикипедия"))
+                    }
+                }
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -128,5 +158,12 @@ fun ArtBreak(show: MainViewModel.ArtShow, busy: Boolean, onApply: () -> Unit, on
                 modifier = Modifier.padding(top = 10.dp),
             )
         }
+    }
+}
+
+private fun openLink(context: android.content.Context, url: String) {
+    if (url.isBlank()) return
+    runCatching {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }

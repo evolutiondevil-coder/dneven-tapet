@@ -100,17 +100,27 @@ import bg.dnevnitapet.i18n.tr
 fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
     val archive by vm.archive.collectAsStateWithLifecycle()
     val translations by vm.translations.collectAsStateWithLifecycle()
-    val loading by vm.archiveLoading.collectAsStateWithLifecycle()
+    val web by vm.web.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it.text) } }
 
-    var text by rememberSaveable { mutableStateOf("") }
+    // 0 = in the internet (the main use), 1 = the pictures seen on this phone.
+    var tab by rememberSaveable { mutableStateOf(0) }
+    var text by rememberSaveable { mutableStateOf(web.query) }
     var category by rememberSaveable { mutableStateOf<Category?>(null) }
     var color by rememberSaveable { mutableStateOf<String?>(null) }
     var country by rememberSaveable { mutableStateOf<String?>(null) }
     var source by rememberSaveable { mutableStateOf<String?>(null) }
     var year by rememberSaveable { mutableStateOf<Int?>(null) }
     var open by remember { mutableStateOf<ArchiveEntry?>(null) }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+    // Typing searches the internet by itself after a short pause.
+    LaunchedEffect(text, tab) {
+        if (tab != 0 || text.trim() == web.query) return@LaunchedEffect
+        kotlinx.coroutines.delay(700)
+        vm.searchWeb(text)
+    }
 
     val entries = archive.entries
     val query = ArchiveSearch.Query(text, category, color, country, source, year)
@@ -119,17 +129,24 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
     val years = remember(entries) { ArchiveSearch.years(entries) }
     val sources = remember(entries) { ArchiveSearch.sources(entries) }
     fun bg(s: String) = translations.entries[s] ?: s
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    // Near the end of the internet results: the next page.
+    LaunchedEffect(gridState, tab) {
+        androidx.compose.runtime.snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { last -> if (tab == 0 && last >= gridState.layoutInfo.totalItemsCount - 6) vm.searchWebMore() }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(tr("Архив")) },
+                title = { Text(tr("Търсене на снимки")) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Назад")) } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Adaptive(minSize = 104.dp),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding() + 4.dp, bottom = padding.calculateBottomPadding() + 32.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -141,7 +158,7 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                     OutlinedTextField(
                         value = text,
                         onValueChange = { text = it },
-                        placeholder = { Text(tr("Търси: море, Норвегия, залез…"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        placeholder = { Text(tr("Търси: България, залез, Париж…"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         trailingIcon = {
                             if (text.isNotEmpty()) IconButton(onClick = { text = "" }) { Icon(Icons.Filled.Close, tr("Изчисти")) }
@@ -149,100 +166,139 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                         singleLine = true,
                         shape = RoundedCornerShape(28.dp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = {
+                            keyboard?.hide()
+                            if (tab == 0) vm.searchWeb(text)
+                        }),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item { ChoiceChip(selected = category == null, onClick = { category = null }, label = { Text(tr("Всички")) }) }
-                        items(Category.entries.toList()) { c ->
-                            ChoiceChip(selected = category == c, onClick = { category = if (category == c) null else c }, label = { Text(c.label) })
+                    // Two places to search: the internet, or the pictures already seen here.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ChoiceChip(selected = tab == 0, onClick = { tab = 0 }, label = { Text(tr("В интернет")) })
+                        ChoiceChip(selected = tab == 1, onClick = { tab = 1 }, label = { Text(tr("Видени от мен ({0})", entries.size)) })
+                    }
+                    if (tab == 0) {
+                        // Quick searches by category.
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(Category.entries.toList()) { c ->
+                                ChoiceChip(
+                                    selected = web.query == c.label,
+                                    onClick = {
+                                        text = c.label
+                                        keyboard?.hide()
+                                        vm.searchWeb(c.label, english = c.searchQuery)
+                                    },
+                                    label = { Text(c.label) },
+                                )
+                            }
+                        }
+                        Text(
+                            when {
+                                web.query.isEmpty() -> tr("Милиони свободни снимки от Wikimedia Commons и NASA. Нищо не се пази в телефона – изтегля се само избраната.")
+                                web.loading && web.results.isEmpty() -> tr("Търся в интернет…")
+                                else -> tr("{0} снимки за „{1}“", web.results.size, web.query) + (web.english?.let { tr(" (и „{0}“)", it) } ?: "")
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                        )
+                    } else {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item { ChoiceChip(selected = category == null, onClick = { category = null }, label = { Text(tr("Всички")) }) }
+                            items(Category.entries.toList()) { c ->
+                                ChoiceChip(selected = category == c, onClick = { category = if (category == c) null else c }, label = { Text(c.label) })
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            ColorBucket.all.forEach { (bucket, argb) ->
+                                ColorDot(Color(argb), bucket == "bw", selected = color == bucket, label = ColorBucket.label(bucket)) {
+                                    color = if (color == bucket) null else bucket
+                                }
+                            }
+                        }
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterMenu(
+                                label = country?.let(::bg) ?: tr("Държава"),
+                                selected = country != null,
+                                options = listOf<String?>(null) + countries,
+                                optionLabel = { it?.let(::bg) ?: tr("Всички държави") },
+                                onSelect = { country = it },
+                            )
+                            FilterMenu(
+                                label = source?.let(SourceRegistry::name)?.substringBefore(" –") ?: tr("Източник"),
+                                selected = source != null,
+                                options = listOf<String?>(null) + sources,
+                                optionLabel = { it?.let(SourceRegistry::name) ?: tr("Всички източници") },
+                                onSelect = { source = it },
+                            )
+                            FilterMenu(
+                                label = year?.toString() ?: tr("Година"),
+                                selected = year != null,
+                                options = listOf<Int?>(null) + years,
+                                optionLabel = { it?.toString() ?: tr("Всички години") },
+                                onSelect = { year = it },
+                            )
+                        }
+                        Text(
+                            "${found.size} ${if (found.size == 1) tr("снимка") else tr("снимки")}" +
+                                listOfNotNull(category?.label?.lowercase(), color?.let(ColorBucket::label), country?.let(::bg), year?.toString())
+                                    .joinToString("") { " · $it" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                        )
+                    }
+                }
+            }
+
+            if (tab == 0) {
+                items(web.results, key = { "web:" + it.candidate.key }) { w ->
+                    ArchiveTile(w.thumbUrl, StoryText.title(w.candidate, translations.entries)) {
+                        open = ArchiveEntry(w.candidate, addedAt = 0)
+                    }
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+                        when {
+                            web.loading -> CircularProgressIndicator(Modifier.size(28.dp))
+                            web.query.isNotEmpty() && web.results.isEmpty() -> Text(
+                                tr("Нищо не намерих. Опитай с друга дума или провери връзката."),
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                            )
+                            web.end && web.results.isNotEmpty() -> Text(
+                                tr("Това е всичко за това търсене."),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ColorBucket.all.forEach { (bucket, argb) ->
-                            ColorDot(Color(argb), bucket == "bw", selected = color == bucket, label = ColorBucket.label(bucket)) {
-                                color = if (color == bucket) null else bucket
+                }
+            } else {
+                if (found.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                if (entries.isEmpty()) tr("Тук се събират снимките, които видиш в приложението.")
+                                else tr("Нищо не намерих. Опитай с друга дума или махни някой филтър."),
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                            )
+                            if (!query.isEmpty) {
+                                TextButton(onClick = {
+                                    text = ""
+                                    category = null
+                                    color = null
+                                    country = null
+                                    source = null
+                                    year = null
+                                }) { Text(tr("Изчисти търсенето")) }
                             }
                         }
                     }
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterMenu(
-                            label = country?.let(::bg) ?: tr("Държава"),
-                            selected = country != null,
-                            options = listOf<String?>(null) + countries,
-                            optionLabel = { it?.let(::bg) ?: tr("Всички държави") },
-                            onSelect = { country = it },
-                        )
-                        FilterMenu(
-                            label = source?.let(SourceRegistry::name)?.substringBefore(" –") ?: tr("Източник"),
-                            selected = source != null,
-                            options = listOf<String?>(null) + sources,
-                            optionLabel = { it?.let(SourceRegistry::name) ?: tr("Всички източници") },
-                            onSelect = { source = it },
-                        )
-                        FilterMenu(
-                            label = year?.toString() ?: tr("Година"),
-                            selected = year != null,
-                            options = listOf<Int?>(null) + years,
-                            optionLabel = { it?.toString() ?: tr("Всички години") },
-                            onSelect = { year = it },
-                        )
-                    }
-                    val summary = listOfNotNull(
-                        category?.label?.lowercase(), color?.let(ColorBucket::label), country?.let(::bg), year?.toString(),
-                    )
-                    Text(
-                        "${found.size} ${if (found.size == 1) tr("снимка") else tr("снимки")}" + summary.joinToString("") { " · $it" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                    )
                 }
-            }
-
-            if (found.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            if (entries.isEmpty()) tr("Тук се събират всички снимки, които видиш. Можеш да заредиш и стари снимки от NASA и Wikimedia.")
-                            else tr("Нищо не намерих. Опитай с друга дума или махни някой филтър."),
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                        )
-                        if (!query.isEmpty) {
-                            TextButton(onClick = {
-                                text = ""
-                                category = null
-                                color = null
-                                country = null
-                                source = null
-                                year = null
-                            }) { Text(tr("Изчисти търсенето")) }
-                        }
-                    }
-                }
-            }
-
-            items(found, key = { it.candidate.key }) { e ->
-                ArchiveTile(e, StoryText.title(e.candidate, translations.entries)) { open = e }
-            }
-
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    OutlinedButton(onClick = vm::loadMoreArchive, enabled = !loading) {
-                        if (loading) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(10.dp))
-                            Text(tr("Зареждам…"))
-                        } else {
-                            Text(tr("Още от архива на NASA и Wikimedia"))
-                        }
-                    }
-                    Text(
-                        tr("По-стари снимки на деня – няколко наведнъж."),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
+                items(found, key = { it.candidate.key }) { e ->
+                    ArchiveTile(File(e.thumb), StoryText.title(e.candidate, translations.entries)) { open = e }
                 }
             }
         }
@@ -288,10 +344,10 @@ private fun <T> FilterMenu(label: String, selected: Boolean, options: List<T>, o
 }
 
 @Composable
-private fun ArchiveTile(e: ArchiveEntry, title: String, onClick: () -> Unit) {
+private fun ArchiveTile(image: Any, title: String, onClick: () -> Unit) {
     Box(Modifier.aspectRatio(3f / 4f).clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick)) {
         AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current).data(File(e.thumb)).crossfade(true).build(),
+            model = ImageRequest.Builder(LocalContext.current).data(image).crossfade(true).build(),
             contentDescription = title,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest),

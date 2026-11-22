@@ -56,6 +56,20 @@ class StoryTranslator(private val context: Context, private val settings: JsonFi
 
     fun cached(text: String): String? = store.value.entries[text.trim()]
 
+    private var toEnglishClient: Translator? = null
+
+    /**
+     * Search words in English ("България" → "Bulgaria"), so the internet search finds more.
+     * Uses the same Bulgarian language pack; null when it is not on the phone.
+     */
+    suspend fun toEnglish(text: String): String? {
+        if (text.isBlank() || !StoryText.isCyrillic(text) || !isReady()) return null
+        val c = toEnglishClient ?: Translation.getClient(
+            TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.BULGARIAN).setTargetLanguage(TranslateLanguage.ENGLISH).build(),
+        ).also { toEnglishClient = it }
+        return runCatching { c.translate(text.trim()).await() }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
     /** The title as shown in the app: Bulgarian when already translated. */
     fun title(c: Candidate): String = StoryText.title(c, store.value.entries)
 

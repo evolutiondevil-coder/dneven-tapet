@@ -26,6 +26,7 @@ object SourceRegistry {
         "spotlight" -> "Windows Spotlight"
         "wikimedia" -> "Wikimedia Commons"
         "apod" -> "NASA APOD"
+        "nasa" -> "NASA"
         "unsplash" -> "Unsplash"
         "pexels" -> "Pexels"
         "mine" -> tr("Моите снимки")

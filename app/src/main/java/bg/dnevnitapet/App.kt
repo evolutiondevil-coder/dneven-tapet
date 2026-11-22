@@ -94,6 +94,7 @@ class AppGraph(private val app: Application) {
     val places = bg.dnevnitapet.story.Places(app, http)
     val archive = bg.dnevnitapet.archive.Archive(app, http)
     val art = bg.dnevnitapet.art.ArtCollection(app, http)
+    val webSearch = bg.dnevnitapet.archive.WebSearch(http)
     val weather = bg.dnevnitapet.wallpaper.WeatherService(http, places)
 
     init {
