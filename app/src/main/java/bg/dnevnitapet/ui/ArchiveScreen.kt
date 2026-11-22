@@ -85,6 +85,7 @@ import bg.dnevnitapet.model.Category
 import bg.dnevnitapet.model.StoredImage
 import bg.dnevnitapet.sources.SourceRegistry
 import bg.dnevnitapet.sources.label
+import bg.dnevnitapet.sources.searchQuery
 import bg.dnevnitapet.story.StoryText
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
