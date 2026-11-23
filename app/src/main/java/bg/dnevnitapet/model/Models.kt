@@ -113,6 +113,12 @@ data class LibraryState(
     val disliked: List<Candidate> = emptyList(),
     /** The user's albums of own photos ("Албуми", optional). */
     val albums: List<Album> = emptyList(),
+    /** "Моят дневник": wallpapers put so far (changes at unlock not counted). */
+    val shownCount: Int = 0,
+    /** yyyy-MM-dd of the days the app was opened (the last 400), for "дни поред". */
+    val openedDays: List<String> = emptyList(),
+    /** yyyy-MM-dd of the first day with the app. */
+    val firstDay: String = "",
 ) {
     fun isFavorite(key: String) = favorites.any { it.key == key }
 }

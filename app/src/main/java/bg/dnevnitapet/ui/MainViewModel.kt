@@ -49,6 +49,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** "Моят дневник": today counts as a day with the app; the first day is remembered. */
+    private fun recordOpenedDay() {
+        val today = java.time.LocalDate.now().toString()
+        viewModelScope.launch {
+            val earliest = (graph.archive.state.value.entries.map { it.addedAt } + library.value.history.map { it.shownAt })
+                .filter { it > 0 }.minOrNull()
+                ?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString() }
+                ?.takeIf { it < today } ?: today
+            graph.library.update { st ->
+                st.copy(
+                    openedDays = (st.openedDays + today).distinct().takeLast(400),
+                    firstDay = st.firstDay.ifBlank { earliest },
+                )
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- language
 
     /**
@@ -483,6 +500,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         checkWelcome()
         if (opened) {
             checkEntrance()
+            recordOpenedDay()
             // Bulgarian titles: the language pack comes once over Wi-Fi, then everything is translated on the phone.
             if (settings.value.translateStories) {
                 graph.appScope.launch { if (runCatching { graph.stories.prepare() }.getOrDefault(false)) translateTitles() }

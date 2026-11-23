@@ -113,6 +113,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -158,6 +159,10 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var showInfo by remember { mutableStateOf(false) }
+    // The logo's card ("Днес" / "Моят дневник") and the story it can open.
+    var showToday by rememberSaveable { mutableStateOf(false) }
+    var storyOf by remember { mutableStateOf<StoredImage?>(null) }
+    val archiveState by vm.archive.collectAsStateWithLifecycle()
     var immersive by rememberSaveable { mutableStateOf(false) }
     var resumeTick by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) {
@@ -343,7 +348,14 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Surface(shape = RoundedCornerShape(50), color = GlassColor, modifier = Modifier.weight(1f, fill = false)) {
+                    // The logo: a tap opens "Днес" / "Моят дневник".
+                    Surface(
+                        onClick = { showToday = !showToday },
+                        shape = RoundedCornerShape(50),
+                        color = GlassColor,
+                        border = if (showToday) BorderStroke(2.dp, SelectedOrange) else null,
+                        modifier = Modifier.weight(1f, fill = false).semantics { contentDescription = tr("Днес") },
+                    ) {
                         Row(Modifier.padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Image(
                                 painterResource(R.mipmap.ic_launcher_background),
@@ -351,15 +363,12 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.size(32.dp).clip(CircleShape),
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                tr("Дневен тапет"),
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleSmall,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Spacer(Modifier.width(7.dp))
+                            // The name on two lines, the second centred under the first.
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(tr("Дневен"), color = Color.White, style = AppName, maxLines = 1, softWrap = false)
+                                Text(tr("Тапет"), color = Color.White, style = AppName, maxLines = 1, softWrap = false)
+                            }
                         }
                     }
                     Row(Modifier.padding(start = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -601,6 +610,61 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             )
         }
 
+        // The logo's card: a tap outside or "back" closes it.
+        if (showToday && !immersive) {
+            BackHandler { showToday = false }
+            Box(
+                Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { showToday = false } },
+            )
+        }
+        AnimatedVisibility(
+            visible = showToday && !immersive,
+            enter = fadeIn() + androidx.compose.animation.slideInVertically { -it / 6 },
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(start = 10.dp, end = 10.dp, top = 60.dp),
+        ) {
+            val today = remember(st, settings, archiveState, translations, resumeTick) {
+                val cur = st.current
+                val next = vm.nextPlanned()
+                TodayInfo(
+                    currentTitle = cur?.let { StoryText.title(it.candidate, translations.entries) },
+                    currentSource = cur?.let { SourceRegistry.name(it.candidate.sourceId) }.orEmpty(),
+                    changedAt = cur?.shownAt ?: 0,
+                    nextLine = when {
+                        !settings.autoChange -> tr("Задържан – не се сменя сам")
+                        next != null -> tr("Следваща смяна: ") + Format.moment(next)
+                        else -> ""
+                    },
+                    ready = st.queue.size,
+                    shownCount = maxOf(st.shownCount, archiveState.entries.count { it.shownAt > 0 }),
+                    favorites = st.favorites.size,
+                    streak = Diary.streak(st.openedDays, java.time.LocalDate.now()),
+                    topCategories = categoryNames(Diary.topCategories(st.favorites.map { it.candidate }, bg.dnevnitapet.sources.CategoryClassifier::classify)),
+                    topSource = Diary.topSource(st.favorites.map { it.candidate }, archiveState.entries.filter { it.shownAt > 0 }.map { it.candidate }),
+                    firstDay = st.firstDay,
+                )
+            }
+            TodayPanel(
+                today,
+                busy = busy,
+                onNewPicture = {
+                    showToday = false
+                    vm.next()
+                },
+                onStory = {
+                    storyOf = st.current
+                },
+                onFavorites = {
+                    showToday = false
+                    onNavigate(Screen.FAVORITES)
+                },
+                onHistory = {
+                    showToday = false
+                    onNavigate(Screen.HISTORY)
+                },
+            )
+        }
+
         // "Пауза за изкуство" after every 20 pictures browsed.
         val artShow by vm.art.collectAsStateWithLifecycle()
         AnimatedVisibility(visible = artShow != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
@@ -642,6 +706,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         )
     }
 
+    storyOf?.let { InfoSheet(it, onDismiss = { storyOf = null }, onSave = { saveToGallery(it) }) }
     if (showInfo && shown != null) {
         InfoSheet(shown, onDismiss = { showInfo = false }, onSave = { saveToGallery(shown) })
     }
@@ -791,6 +856,9 @@ private fun SwitchPart(text: String, selected: Boolean, onClick: () -> Unit) {
 
 /** How much bigger the picture starts when the app opens (it settles to normal size). */
 private const val ENTRANCE_ZOOM = 1.12f
+
+/** The app's name in the logo capsule (two short lines). */
+private val AppName = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold)
 
 /** The dark see-through colour of the glass capsules at the top. */
 private val GlassColor = Color(0xFF141418).copy(alpha = 0.45f)

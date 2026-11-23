@@ -434,6 +434,7 @@ class WallpaperEngine(
                 history = history,
                 seen = (st.seen + shown.key).distinct().takeLast(SEEN_LIMIT),
                 lastChangeAt = now,
+                shownCount = if (trigger == Trigger.UNLOCK) st.shownCount else st.shownCount + 1,
                 lastAutoChangeAt = if (trigger == Trigger.SCHEDULED) now else st.lastAutoChangeAt,
                 // Changes at every unlock would fill the log; they are not written there.
                 log = if (trigger == Trigger.UNLOCK) st.log else appendLog(st.log, logPrefix(trigger) + shown.candidate.title),

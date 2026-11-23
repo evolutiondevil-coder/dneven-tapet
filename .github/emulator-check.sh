@@ -158,6 +158,13 @@ sleep 2
 tap "Моите снимки" && shot 09b-my-photos 3
 adb shell input keyevent KEYCODE_BACK
 sleep 2
+# The logo: "Днес", and a swipe to "Моят дневник".
+tap "Днес" && shot 09b2-today 2
+adb shell input swipe 900 650 150 650 300
+shot 09b3-diary 2
+if has_text "Моят дневник"; then echo "OK: the logo's card swipes to Моят дневник"; else echo "FAIL: Моят дневник not shown after the swipe"; fi | tee -a "$OUT/summary.txt"
+adb shell input keyevent KEYCODE_BACK
+sleep 1
 tap "Архив" && shot 09c-search 3
 # Internet search: type a word, results come from Wikimedia/NASA.
 adb shell input text "Sofia" && sleep 1 && adb shell input keyevent KEYCODE_ENTER

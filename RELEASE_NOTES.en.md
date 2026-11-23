@@ -1,9 +1,10 @@
-## What's new in v1.7.2
+## What's new in v1.7.3
 
-- **New top bar:** the logo and the name in a glass capsule, each button in its own dark circle – readable on any picture.
+- **The logo at the top:** the whole name shows – “Daily” and “Wallpaper” under it.
+- **Tap the logo:** a “Today” card – greeting, the current wallpaper, the next change and “New picture now”; swipe it for **“My diary”** – how many wallpapers you saw, favourites, days in a row and what you like most.
 
-## In v1.7.1
+## In v1.7.2
 
-- Internet search, a greeting at every opening, more about each painting and a 4 times smaller file.
+- New top bar with glass capsules.
 
 **Install:** on the phone tap the file `DnevenTapet-….apk` below (under “Assets”) and open it.
