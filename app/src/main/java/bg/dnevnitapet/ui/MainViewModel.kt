@@ -137,6 +137,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------------------------------------------------------- art break
 
     /** A painting shown as "Пауза за изкуство", with its title and story in Bulgarian when possible. */
+    // ---------------------------------------------------------------- on this day
+
+    private val _dayFact = MutableStateFlow<bg.dnevnitapet.story.DayFact?>(null)
+
+    /** "На този ден" for the logo's card: an event from history on today's date (Wikipedia). */
+    val dayFact: StateFlow<bg.dnevnitapet.story.DayFact?> = _dayFact.asStateFlow()
+    private var dayFactLoading = false
+
+    /** Loads today's event once a day (at an opening, or when the card opens and it is still missing). */
+    fun loadDayFact() {
+        val lang = if (bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.EN) "en" else "bg"
+        val today = java.time.LocalDate.now().toString()
+        if (_dayFact.value?.let { it.date == today && it.lang == lang } == true || dayFactLoading) return
+        graph.onThisDay.cached(lang)?.let { _dayFact.value = it; return }
+        dayFactLoading = true
+        viewModelScope.launch {
+            try {
+                graph.onThisDay.today(lang)?.let { _dayFact.value = it }
+            } finally {
+                dayFactLoading = false
+            }
+        }
+    }
+
     data class ArtShow(val art: bg.dnevnitapet.art.Artwork, val title: String, val story: String)
 
     private val _art = MutableStateFlow<ArtShow?>(null)
@@ -501,6 +525,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (opened) {
             checkEntrance()
             recordOpenedDay()
+            loadDayFact()
             // Bulgarian titles: the language pack comes once over Wi-Fi, then everything is translated on the phone.
             if (settings.value.translateStories) {
                 graph.appScope.launch { if (runCatching { graph.stories.prepare() }.getOrDefault(false)) translateTitles() }

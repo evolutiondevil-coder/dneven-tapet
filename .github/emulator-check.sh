@@ -158,8 +158,10 @@ sleep 2
 tap "Моите снимки" && shot 09b-my-photos 3
 adb shell input keyevent KEYCODE_BACK
 sleep 2
-# The logo: "Днес", and a swipe to "Моят дневник".
-tap "Днес" && shot 09b2-today 2
+# The logo: "Днес" (with "На този ден" from Wikipedia), and a swipe to "Моят дневник".
+tap "Днес" && shot 09b2-today 3
+if has_text "На този ден"; then echo "OK: the logo's card shows На този ден"; else echo "FAIL: На този ден not shown on the logo's card"; fi | tee -a "$OUT/summary.txt"
+echo "== texts on the card:"; grep -oE 'text="[^"]+"' /tmp/ui.xml | head -n 24 || true
 adb shell input swipe 900 650 150 650 300
 shot 09b3-diary 2
 if has_text "Моят дневник"; then echo "OK: the logo's card swipes to Моят дневник"; else echo "FAIL: Моят дневник not shown after the swipe"; fi | tee -a "$OUT/summary.txt"

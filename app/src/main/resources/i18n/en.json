@@ -540,5 +540,14 @@
  "✓ Работа на заден план: разрешена": "✓ Background work: allowed",
  "✓ Работи · {0}": "✓ Works · {0}",
  "✓ Работи надеждно": "✓ Works reliably",
- "🎨 Пауза за изкуство": "🎨 Art break"
+ "🎨 Пауза за изкуство": "🎨 Art break",
+ "На този ден": "On this day",
+ "Прочети още в Уикипедия ›": "Read more on Wikipedia ›",
+ "Още няма – избери снимка от началния екран": "None yet – pick a picture on the home screen",
+ "Следващата снимка идва всеки момент": "The next picture is coming any moment",
+ "Следващата снимка – след {0}": "Next picture in {0}",
+ "Следващата снимка – {0}": "Next picture: {0}",
+ "{0} мин": "{0} min",
+ "{0} ч": "{0} h",
+ "{0} ч {1} мин": "{0} h {1} min"
 }

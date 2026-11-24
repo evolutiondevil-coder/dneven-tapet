@@ -29,6 +29,18 @@ object Format {
         }
     }
 
+    /** A time span in hours and minutes: "8 ч 11 мин", "45 мин", "3 ч". */
+    fun duration(ms: Long): String {
+        val minutes = ((ms + 59_999) / 60_000).coerceAtLeast(1)
+        val h = minutes / 60
+        val m = minutes % 60
+        return when {
+            h == 0L -> tr("{0} мин", m)
+            m == 0L -> tr("{0} ч", h)
+            else -> tr("{0} ч {1} мин", h, m)
+        }
+    }
+
     fun date(iso: String): String = runCatching { LocalDate.parse(iso).format(day) }.getOrDefault(iso)
 
     fun minuteOfDay(m: Int): String = "%02d:%02d".format(m / 60, m % 60)

@@ -623,18 +623,18 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(start = 10.dp, end = 10.dp, top = 60.dp),
         ) {
-            val today = remember(st, settings, archiveState, translations, resumeTick) {
+            val dayFact by vm.dayFact.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) { vm.loadDayFact() }
+            val today = remember(st, settings, archiveState, translations, resumeTick, dayFact) {
                 val cur = st.current
                 val next = vm.nextPlanned()
                 TodayInfo(
                     currentTitle = cur?.let { StoryText.title(it.candidate, translations.entries) },
                     currentSource = cur?.let { SourceRegistry.name(it.candidate.sourceId) }.orEmpty(),
+                    currentFile = cur?.file?.takeIf { java.io.File(it).exists() },
                     changedAt = cur?.shownAt ?: 0,
-                    nextLine = when {
-                        !settings.autoChange -> tr("Задържан – не се сменя сам")
-                        next != null -> tr("Следваща смяна: ") + Format.moment(next)
-                        else -> ""
-                    },
+                    autoChange = settings.autoChange,
+                    nextAt = next ?: 0L,
                     ready = st.queue.size,
                     shownCount = maxOf(st.shownCount, archiveState.entries.count { it.shownAt > 0 }),
                     favorites = st.favorites.size,
@@ -642,15 +642,11 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     topCategories = categoryNames(Diary.topCategories(st.favorites.map { it.candidate }, bg.dnevnitapet.sources.CategoryClassifier::classify)),
                     topSource = Diary.topSource(st.favorites.map { it.candidate }, archiveState.entries.filter { it.shownAt > 0 }.map { it.candidate }),
                     firstDay = st.firstDay,
+                    fact = dayFact,
                 )
             }
             TodayPanel(
                 today,
-                busy = busy,
-                onNewPicture = {
-                    showToday = false
-                    vm.next()
-                },
                 onStory = {
                     storyOf = st.current
                 },
