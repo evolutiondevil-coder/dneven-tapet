@@ -392,9 +392,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Looks on GitHub for a newer version; [manual] = "Провери сега" (always asks, reports the result). */
     fun checkForUpdate(manual: Boolean) {
+        if (!manual) {
+            // At an opening the network is often not ready yet (the phone just woke up): a failed
+            // question is asked again a few times instead of trusting an old answer.
+            updateJob?.cancel()
+            updateJob = viewModelScope.launch {
+                for (wait in listOf(0L, 4_000L, 10_000L, 30_000L)) {
+                    kotlinx.coroutines.delay(wait)
+                    if (runCatching { graph.updater.check(minGapMs = UPDATE_CHECK_GAP_MS, allowStale = false) }.isSuccess) return@launch
+                }
+                runCatching { graph.updater.check(minGapMs = UPDATE_CHECK_GAP_MS) }
+            }
+            return
+        }
         viewModelScope.launch {
-            val r = runCatching { graph.updater.check(minGapMs = if (manual) 0L else UPDATE_CHECK_GAP_MS) }
-            if (!manual) return@launch
+            val r = runCatching { graph.updater.check(minGapMs = 0L) }
             val newer = r.getOrNull()
             say(
                 when {
@@ -406,6 +418,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (newer != null) _updatePromptDismissed.value = false
         }
     }
+
+    private var updateJob: kotlinx.coroutines.Job? = null
 
     fun dismissUpdatePrompt() {
         _updatePromptDismissed.value = true

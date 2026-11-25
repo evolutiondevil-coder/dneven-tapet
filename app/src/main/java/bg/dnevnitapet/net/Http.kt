@@ -11,6 +11,12 @@ interface Http {
     /** Downloads [url] into [dest]. Fails if the answer is not an image or is larger than [maxBytes]. */
     suspend fun downloadImage(url: String, dest: File, maxBytes: Long = 60L * 1024 * 1024, headers: Map<String, String> = emptyMap())
 
+    /**
+     * Where [url] ends up after redirects (asked with HEAD, nothing is downloaded). Fails when the
+     * final answer is not 2xx – so it also tells whether a file exists.
+     */
+    suspend fun resolve(url: String): String = url
+
     /** Fire-and-forget GET whose body is ignored. */
     suspend fun ping(url: String, headers: Map<String, String> = emptyMap())
 }

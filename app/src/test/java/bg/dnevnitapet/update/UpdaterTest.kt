@@ -18,6 +18,17 @@ class UpdaterTest {
     }
 
     @Test
+    fun readsTheTagFromTheReleasesPage() {
+        assertEquals("v1.8.0", WebRelease.tagOf("https://github.com/evolutiondevil-coder/dneven-tapet/releases/tag/v1.8.0"))
+        assertEquals("v1.10.2", WebRelease.tagOf("https://github.com/o/r/releases/tag/v1.10.2/"))
+        assertNull(WebRelease.tagOf("https://github.com/evolutiondevil-coder/dneven-tapet/releases"))
+        assertEquals(
+            "https://github.com/evolutiondevil-coder/dneven-tapet/releases/download/v1.8.0/DnevenTapet-1.8.0.apk",
+            WebRelease.apkUrl("v1.8.0", "1.8.0"),
+        )
+    }
+
+    @Test
     fun testBuildsNeverAskForUpdates() {
         assertFalse(Versions.isNewer("v1.3.0", "1.0.31-dev"))
         assertFalse(Versions.isNewer("v1.3.0", "0.0.0-local"))

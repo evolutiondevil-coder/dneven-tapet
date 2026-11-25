@@ -20,6 +20,14 @@ class OkHttpHttp(
         }
     }
 
+    override suspend fun resolve(url: String): String = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url(url).header("User-Agent", USER_AGENT).head().build()
+        client.newCall(req).execute().use { response ->
+            if (!response.isSuccessful) throw HttpStatusException(response.code, url)
+            response.request.url.toString()
+        }
+    }
+
     override suspend fun downloadImage(url: String, dest: File, maxBytes: Long, headers: Map<String, String>) =
         withContext(Dispatchers.IO) {
             client.newCall(request(url, headers)).execute().use { response ->
