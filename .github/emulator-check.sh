@@ -54,7 +54,17 @@ has_text() {
 status=0
 # The panorama test switches the live wallpaper on through a system call a normal app cannot use.
 adb shell settings put global hidden_api_policy 1 || true
-./gradlew --no-daemon connectedDebugAndroidTest || status=$?
+./gradlew --no-daemon connectedDebugAndroidTest 2>&1 | tee "$OUT/gradle-test.txt"
+status=${PIPESTATUS[0]}
+# The Android 7 emulator sometimes fails to receive the APK ("install-write"): try once more.
+if [ "$status" -ne 0 ] && grep -q "Failed to install" "$OUT/gradle-test.txt"; then
+  echo "The test APKs did not install – trying once more"
+  adb reconnect > /dev/null 2>&1 || true
+  adb wait-for-device
+  sleep 10
+  status=0
+  ./gradlew --no-daemon connectedDebugAndroidTest || status=$?
+fi
 # If the system restarted meanwhile, wait until it is up again.
 adb wait-for-device
 for i in $(seq 1 60); do [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break; sleep 2; done
@@ -70,8 +80,26 @@ adb logcat -d -s DnevenTapetTest:I > "$OUT/test-log.txt" || true
 adb shell input keyevent KEYCODE_HOME
 shot 01-home-after-tests 4
 
+# Installs an APK; when adb's streamed install fails (seen on the Android 7 emulator), the file is
+# pushed to the phone and installed there. Up to three tries.
+install_apk() {
+  local apk="$1" pkg="$2" try
+  for try in 1 2 3; do
+    adb install -r -t "$apk" && adb shell pm path "$pkg" | grep -q "package:" && return 0
+    echo "install of $apk failed (try $try) – installing from the phone's storage"
+    adb push "$apk" /data/local/tmp/install.apk > /dev/null \
+      && adb shell pm install -r -t /data/local/tmp/install.apk \
+      && adb shell pm path "$pkg" | grep -q "package:" && return 0
+    adb reconnect > /dev/null 2>&1 || true
+    adb wait-for-device
+    sleep 5
+  done
+  echo "FAIL: the app could not be installed" | tee -a "$OUT/summary.txt"
+  return 1
+}
+
 # The app from a fresh install: welcome screen, then "Start" downloads and sets the first picture.
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+install_apk app/build/outputs/apk/debug/app-debug.apk bg.dnevnitapet
 adb shell am start -W -n bg.dnevnitapet/.ui.MainActivity
 shot 01b-language 5
 # First start: the language. Bulgarian (the emulator is English, so the app restarts in Bulgarian).
