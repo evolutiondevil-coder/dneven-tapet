@@ -253,9 +253,9 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     ) { v -> update { it.copy(learnTaste = v) } }
                     ToggleRow(
                         Icons.Outlined.Palette, Tint.PINK, tr("Пауза за изкуство"),
-                        tr("На всеки 20 разгледани снимки – известна картина и историята ѝ"),
-                        s.artBreaks,
-                    ) { v -> update { it.copy(artBreaks = v) } }
+                        tr("На всеки 30 разгледани снимки – известна картина и историята ѝ"),
+                        s.artOn,
+                    ) { v -> update { it.copy(artBreaks = v, artBreaksAgreed = v || it.artBreaksAgreed, artBreaksAsked = it.artBreaksAsked || v) } }
                     // Translating the stories is only for Bulgarian (in English they are original).
                     if (bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.BG) {
                         ToggleRow(

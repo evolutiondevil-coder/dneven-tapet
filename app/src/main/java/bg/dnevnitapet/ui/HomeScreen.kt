@@ -672,7 +672,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
         // "Пауза за изкуство" after every 20 pictures browsed.
         val artShow by vm.art.collectAsStateWithLifecycle()
         AnimatedVisibility(visible = artShow != null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-            artShow?.let { a -> ArtBreak(a, busy, onApply = { vm.applyArt(a) }, onClose = vm::closeArt) }
+            artShow?.let { a -> ArtBreak(a, busy, onApply = { vm.applyArt(a) }, onClose = vm::closeArt, onAnswer = vm::answerArt) }
         }
 
         // First start: four short pages about the app.

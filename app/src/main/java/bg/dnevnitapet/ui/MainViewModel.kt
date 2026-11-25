@@ -136,7 +136,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------------------------------------------------------- art break
 
-    /** A painting shown as "Пауза за изкуство", with its title and story in Bulgarian when possible. */
     // ---------------------------------------------------------------- on this day
 
     private val _dayFact = MutableStateFlow<bg.dnevnitapet.story.DayFact?>(null)
@@ -161,7 +160,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    data class ArtShow(val art: bg.dnevnitapet.art.Artwork, val title: String, val story: String)
+    /**
+     * A painting shown as "Пауза за изкуство", with its title and story in Bulgarian when possible.
+     * [ask]: the first one asks whether more should come.
+     */
+    data class ArtShow(val art: bg.dnevnitapet.art.Artwork, val title: String, val story: String, val ask: Boolean = false)
 
     private val _art = MutableStateFlow<ArtShow?>(null)
     val art: StateFlow<ArtShow?> = _art.asStateFlow()
@@ -170,17 +173,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var nextArt: ArtShow? = null
     private var artLoading = false
 
+    /** One painting per opening of the app at most. */
+    private var artShownThisOpening = false
+
     /** Counts the pictures browsed; every [ART_EVERY] comes a painting (prepared a few pictures before). */
     private fun countViewed(key: String) {
         if (key == lastViewedKey) return
         lastViewedKey = key
-        if (!settings.value.artBreaks) return
+        val s = settings.value
+        if (!s.artOn || artShownThisOpening) return
         viewedSinceArt++
         if (viewedSinceArt >= ART_EVERY - 4 && nextArt == null) prepareArt()
         if (viewedSinceArt >= ART_EVERY && nextArt != null && _art.value == null) {
-            _art.value = nextArt
+            val ask = !s.artBreaksAsked
+            _art.value = nextArt!!.copy(ask = ask)
             nextArt = null
             viewedSinceArt = 0
+            artShownThisOpening = true
+            // Asked once: closing without an answer means no more paintings (they come only after a yes).
+            if (ask) updateSettings { it.copy(artBreaksAsked = true) }
+        }
+    }
+
+    /** The answer to "show more paintings?" on the first one. */
+    fun answerArt(more: Boolean) {
+        updateSettings { it.copy(artBreaksAsked = true, artBreaksAgreed = more, artBreaks = more) }
+        if (more) {
+            _art.value = _art.value?.copy(ask = false)
+        } else {
+            closeArt()
+            say(tr("Добре – няма да показвам картини. Можеш да ги пуснеш от Настройки."))
         }
     }
 
@@ -189,16 +211,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         artLoading = true
         viewModelScope.launch {
             try {
-                val a = runCatching { graph.art.next() }.getOrNull() ?: return@launch
-                val c = a.candidate()
-                // In Bulgarian as far as possible (the language pack comes over Wi-Fi once).
-                runCatching { graph.stories.prepare() }
-                val story = runCatching { graph.stories.story(c) }.getOrNull()
-                nextArt = ArtShow(a, story?.title ?: a.title, story?.description ?: a.story)
+                nextArt = buildArt()
             } finally {
                 artLoading = false
             }
         }
+    }
+
+    private suspend fun buildArt(): ArtShow? {
+        val raw = runCatching { graph.art.next() }.getOrNull() ?: return null
+        // Without Wikimedia's machine text ("label QS:…") and with a short date.
+        val a = bg.dnevnitapet.art.ArtText.cleaned(raw, bulgarian = bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.BG)
+        // In Bulgarian as far as possible (the language pack comes over Wi-Fi once).
+        runCatching { graph.stories.prepare() }
+        val story = runCatching { graph.stories.story(a.candidate()) }.getOrNull()
+        return ArtShow(a, story?.title ?: a.title, story?.description ?: a.story)
+    }
+
+    /** Test builds only: show the first painting (with its question) right away, for the screen checks. */
+    fun debugShowArt() {
+        if (!bg.dnevnitapet.BuildConfig.DEBUG) return
+        viewModelScope.launch { buildArt()?.let { _art.value = it.copy(ask = true) } }
     }
 
     fun closeArt() {
@@ -537,6 +570,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         resumedBefore = true
         checkWelcome()
         if (opened) {
+            artShownThisOpening = false
             checkEntrance()
             recordOpenedDay()
             loadDayFact()
@@ -1016,7 +1050,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private const val PREFETCH_AHEAD = 4
 
         /** "Пауза за изкуство" after this many pictures browsed. */
-        private const val ART_EVERY = 20
+        private const val ART_EVERY = 30
 
         /** Back in the app after at least this long counts as a new opening (the entrance plays). */
         private const val OPEN_GAP_MS = 20_000L

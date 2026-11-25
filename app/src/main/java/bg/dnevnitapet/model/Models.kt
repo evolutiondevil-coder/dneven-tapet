@@ -194,8 +194,11 @@ data class Settings(
     val greetedDay: String = "",
     /** Titles and stories of the pictures in Bulgarian (automatic translation, language pack once over Wi-Fi). */
     val translateStories: Boolean = true,
-    /** "Пауза за изкуство": after every 20 pictures browsed on the main screen, a famous painting and its story. */
+    /** "Пауза за изкуство": after every 30 pictures browsed on the main screen, a famous painting and its story. */
     val artBreaks: Boolean = true,
+    /** The first painting asked "show more?"; after that they come only when the answer was yes. */
+    val artBreaksAsked: Boolean = false,
+    val artBreaksAgreed: Boolean = false,
     /** Every opening of the app: the picture settles in and a short phrase appears ("Здравей отново"). */
     val openGreeting: Boolean = true,
     val frequency: FrequencyMode = FrequencyMode.DAILY,
@@ -212,6 +215,9 @@ data class Settings(
 ) {
     /** Panorama that actually applies: only the home screen slides. */
     val panoramaOn: Boolean get() = panorama && target != WallpaperTarget.LOCK
+
+    /** Paintings come: switched on, and either not asked yet (the first one asks) or agreed to. */
+    val artOn: Boolean get() = artBreaks && (artBreaksAgreed || !artBreaksAsked)
 
     /** The home screen is drawn by the app's own live wallpaper (panorama, an effect, or unlock/double-tap changes). */
     val liveOn: Boolean

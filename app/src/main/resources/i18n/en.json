@@ -171,7 +171,6 @@
  "Зиме – сняг и планини, лете – море и плажове": "Winter – snow and mountains, summer – sea and beaches",
  "И двата": "Both",
  "И двата · различни снимки": "Both · different pictures",
- "Идва на всеки 20 разгледани снимки · изключва се от Настройки": "Comes every 20 pictures you browse · can be turned off in Settings",
  "Избери": "Choose",
  "Избери език": "Choose a language",
  "Избери снимки от телефона": "Choose photos from the phone",
@@ -236,7 +235,6 @@
  "Моя снимка не се изряза наново: {0}": "A photo was not cropped again: {0}",
  "Моят дневник": "My diary",
  "На Samsung има и вграден „Динамичен заключен екран“ – ползвай само едното от двете.": "Samsung also has a built-in “Dynamic Lock screen” – use only one of the two.",
- "На всеки 20 разгледани снимки – известна картина и историята ѝ": "Every 20 pictures you browse – a famous painting and its story",
  "На всеки {0} дни": "Every {0} days",
  "На всеки {0} часа": "Every {0} hours",
  "На всеки няколко часа": "Every few hours",
@@ -552,5 +550,12 @@
  "Още няма история": "No history yet",
  "Още нямаш добавени снимки": "No photos added yet",
  "Добави снимки от галерията и те ще се сменят като тапет.": "Add photos from your gallery and they will take turns as your wallpaper.",
- "Търси из милиони снимки": "Search millions of pictures"
+ "Търси из милиони снимки": "Search millions of pictures",
+ "На всеки 30 разгледани снимки – известна картина и историята ѝ": "Every 30 pictures you browse – a famous painting and its story",
+ "Добре – няма да показвам картини. Можеш да ги пуснеш от Настройки.": "OK – no more paintings. You can turn them on in Settings.",
+ "Да показвам ли картина на всеки 30 разгледани снимки?": "Show a painting every 30 pictures you browse?",
+ "Най-много веднъж, докато приложението е отворено.": "At most once while the app is open.",
+ "Не, благодаря": "No, thanks",
+ "Да, показвай": "Yes, show them",
+ "Wikimedia Commons · обществено достояние": "Wikimedia Commons · public domain"
 }

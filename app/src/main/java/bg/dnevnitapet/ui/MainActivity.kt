@@ -37,6 +37,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Screen checks of test builds open the painting screen directly.
+        if (bg.dnevnitapet.BuildConfig.DEBUG && intent?.getBooleanExtra("debugArt", false) == true) vm.debugShowArt()
         setContent {
             AppTheme {
                 var screen by rememberSaveable { mutableStateOf(Screen.HOME) }
