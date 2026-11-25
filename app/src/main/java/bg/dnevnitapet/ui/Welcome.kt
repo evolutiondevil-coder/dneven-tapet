@@ -68,8 +68,8 @@ import bg.dnevnitapet.i18n.tr
 /** Words of the daily greeting. Pure logic, unit-tested. */
 object Greeting {
     fun phrase(hour: Int): String = when (hour) {
-        in 5..10 -> tr("Добро утро")
-        in 11..17 -> tr("Добър ден")
+        in 5..11 -> tr("Добро утро")
+        in 12..17 -> tr("Добър ден")
         else -> tr("Добър вечер")
     }
 
@@ -80,10 +80,10 @@ object Greeting {
     /** The short phrases for opening the app at [time]: by the time of day, the day of the week, and general ones. */
     fun openPhrases(time: java.time.LocalDateTime): List<String> {
         val byTime = when (time.hour) {
-            in 5..10 -> listOf(tr("Добро утро"), tr("Приятна сутрин"))
-            in 11..17 -> listOf(tr("Добър ден"), tr("Хубав ден"))
+            in 5..11 -> listOf(tr("Добро утро"), tr("Приятна сутрин"))
+            in 12..17 -> listOf(tr("Добър ден"), tr("Хубав ден"))
             in 18..21 -> listOf(tr("Добър вечер"), tr("Хубава вечер"))
-            else -> listOf(tr("Тиха нощ"), tr("Спокойна нощ"))
+            else -> listOf(tr("Лека нощ"), tr("Спокойна нощ"))
         }
         val day = when (time.dayOfWeek!!) {
             java.time.DayOfWeek.MONDAY -> tr("Приятен понеделник")

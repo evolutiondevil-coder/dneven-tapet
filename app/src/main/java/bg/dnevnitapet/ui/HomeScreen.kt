@@ -411,7 +411,12 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f).padding(end = 8.dp)) {
                             if (shown != null && !isCurrent) {
-                                Surface(onClick = vm::showCurrent, shape = RoundedCornerShape(50), color = Color(0xCC2D5DA8)) {
+                                Surface(
+                                    onClick = vm::showCurrent,
+                                    shape = RoundedCornerShape(50),
+                                    color = GlassColor,
+                                    border = BorderStroke(1.dp, SelectedOrange.copy(alpha = 0.85f)),
+                                ) {
                                     Text(
                                         tr("{0}  ·  към сегашния", position),
                                         color = Color.White,
@@ -795,20 +800,20 @@ private fun HoldChip(held: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(50),
-        color = if (held) Color(0xCC2D5DA8) else Color.Black.copy(alpha = 0.3f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = if (held) 0.6f else 0.4f)),
+        // On hold = switched on, so orange like everything chosen in the app.
+        color = if (held) SelectedOrange else GlassColor,
+        contentColor = if (held) OnSelectedOrange else Color.White,
+        border = if (held) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
     ) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 if (held) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                 contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(15.dp),
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(5.dp))
             Text(
                 if (held) tr("Пусни") else tr("Задръж"),
-                color = Color.White,
                 style = MaterialTheme.typography.labelMedium,
                 maxLines = 1,
                 softWrap = false,
@@ -823,7 +828,7 @@ private fun HoldChip(held: Boolean, onClick: () -> Unit) {
  */
 @Composable
 private fun SourceSwitch(online: Boolean, onSelect: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Surface(shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = 0.38f), modifier = modifier) {
+    Surface(shape = RoundedCornerShape(50), color = GlassColor, modifier = modifier) {
         Row(Modifier.padding(3.dp)) {
             SwitchPart(tr("Моите снимки"), selected = !online) { onSelect(false) }
             SwitchPart(tr("От интернет"), selected = online) { onSelect(true) }
@@ -854,10 +859,10 @@ private fun SwitchPart(text: String, selected: Boolean, onClick: () -> Unit) {
 private const val ENTRANCE_ZOOM = 1.12f
 
 /** The app's name in the logo capsule (two short lines). */
-private val AppName = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold)
+private val AppName = androidx.compose.ui.text.TextStyle(fontFamily = Manrope, fontSize = 13.sp, lineHeight = 14.sp, fontWeight = FontWeight.ExtraBold)
 
 /** The dark see-through colour of the glass capsules at the top. */
-private val GlassColor = Color(0xFF141418).copy(alpha = 0.45f)
+private val GlassColor = Color(0xFF16110D).copy(alpha = 0.45f)
 
 /** A button of the top bar: its icon in a dark see-through circle. */
 @Composable

@@ -49,7 +49,7 @@ import bg.dnevnitapet.i18n.AppLanguage
  */
 @Composable
 fun LanguagePicker(suggested: AppLanguage, onPick: (AppLanguage) -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color(0xFF101418))) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF17120E))) {
         Image(
             painterResource(R.mipmap.ic_launcher_background),
             contentDescription = null,

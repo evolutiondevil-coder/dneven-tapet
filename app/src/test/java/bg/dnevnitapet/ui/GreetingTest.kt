@@ -23,7 +23,7 @@ class GreetingTest {
 
         // At night no wish for the day.
         val night = Greeting.openPhrases(LocalDateTime.of(2026, 11, 21, 23, 40))
-        assertTrue("Тиха нощ" in night)
+        assertTrue("Лека нощ" in night)
         assertFalse(night.any { it.startsWith("Приятн") })
     }
 

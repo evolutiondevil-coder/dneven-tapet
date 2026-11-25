@@ -60,7 +60,7 @@ class ImageProcessor {
         if (manualCrop == null && !allowUpscale) {
             val upscale = targetH / min(h.toDouble(), w / aspect)
             if (upscale > VariantChooser.MAX_UPSCALE) {
-                throw ImageTooSmallException(tr("Снимката е с твърде ниска резолюция ({0}x{1})", w, h))
+                throw ImageTooSmallException(tr("Снимката е с твърде ниска резолюция ({0} × {1})", w, h))
             }
         }
 

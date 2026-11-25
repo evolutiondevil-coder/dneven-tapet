@@ -1,5 +1,8 @@
 package bg.dnevnitapet.ui
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeTopAppBar
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
@@ -86,7 +89,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -161,11 +163,16 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     val update: ((Settings) -> Settings) -> Unit = vm::updateSettings
     val problems = listOf(!unrestricted, !exact, unusedPause == true, dataSaver && !s.wifiOnly).count { it }
 
+    // A large title that shrinks into the bar while scrolling (the modern Android look).
+    val bar = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(bar.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text(tr("Настройки")) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, tr("Назад")) } },
+                scrollBehavior = bar,
+                colors = TopAppBarDefaults.largeTopAppBarColors(scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -585,7 +592,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     }
                     SwitchRow(
                         tr("Проверявай за нова версия"),
-                        tr("При всяко отваряне – ако има, приложението пита дали да се обнови"),
+                        tr("Проверява при всяко отваряне и пита, ако има нова"),
                         s.checkUpdates,
                     ) { v -> update { it.copy(checkUpdates = v) } }
                     @OptIn(ExperimentalLayoutApi::class)
@@ -598,7 +605,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                         } else {
                             OutlinedButton(onClick = { vm.checkForUpdate(manual = true) }) { Text(tr("Провери сега")) }
                         }
-                        TextButton(onClick = { showLog = true }) { Text(tr("Дневник")) }
+                        TextButton(onClick = { showLog = true }) { Text(tr("Събития")) }
                     }
                 }
             }
@@ -624,7 +631,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
     if (showLog) {
         AlertDialog(
             onDismissRequest = { showLog = false },
-            title = { Text(tr("Дневник")) },
+            title = { Text(tr("Събития")) },
             text = {
                 LazyColumn(Modifier.height(420.dp)) {
                     val entries = st.log.asReversed()
@@ -988,7 +995,7 @@ private fun RulesSheetContent(vm: MainViewModel, s: Settings, update: ((Settings
     Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.padding(horizontal = 16.dp)) {
         Column(Modifier.fillMaxWidth()) {
             ToggleRow(
-                Icons.Outlined.CalendarMonth, Tint.BLUE, tr("Според сезона"), tr("Зиме повече сняг и планини, лете море и плажове"),
+                Icons.Outlined.CalendarMonth, Tint.BLUE, tr("Според сезона"), tr("Зиме – сняг и планини, лете – море и плажове"),
                 s.seasonRules, first = true, note = tr("По избор"),
             ) { v -> update { it.copy(seasonRules = v) } }
             ToggleRow(

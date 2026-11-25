@@ -88,11 +88,11 @@ class TodayInfo(
     val fact: DayFact?,
 )
 
-private val CardColor = Color(0xF51C1B1F)
-private val BoxColor = Color(0xFF26252B)
-private val Muted = Color(0xFFA9A7B0)
+private val CardColor = Color(0xF51F1915)
+private val BoxColor = Color(0xFF2E2722)
+private val Muted = Color(0xFFB8A99D)
 private val Accent = Color(0xFFFFB74D)
-private val Soft = Color(0xFFC4C6D0)
+private val Soft = Color(0xFFD8CBC0)
 
 /**
  * A tap on the logo: a card with two pages, changed by swiping – "Днес" (greeting, an event from
@@ -268,7 +268,7 @@ private fun DiaryPage(info: TodayInfo, onFavorites: () -> Unit, onHistory: () ->
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (info.topCategories.isEmpty()) {
-            Text(tr("Харесвай снимки с ♥ и тук ще видиш какво обичаш най-много."), style = MaterialTheme.typography.bodySmall, color = Color(0xFFC4C6D0))
+            Text(tr("Харесвай снимки с ♥ и тук ще видиш какво обичаш най-много."), style = MaterialTheme.typography.bodySmall, color = Soft)
         } else {
             DiaryLine(tr("Най-харесвани: "), info.topCategories.joinToString(tr(" и ")))
         }
@@ -285,7 +285,7 @@ private fun DiaryPage(info: TodayInfo, onFavorites: () -> Unit, onHistory: () ->
             onClick = onHistory,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
             modifier = Modifier.weight(1f).height(46.dp),
-        ) { Text(tr("Историята"), maxLines = 1, softWrap = false) }
+        ) { Text(tr("Виж историята"), maxLines = 1, softWrap = false) }
     }
 }
 
@@ -293,7 +293,7 @@ private fun DiaryPage(info: TodayInfo, onFavorites: () -> Unit, onHistory: () ->
 private fun Stat(value: String, label: String, modifier: Modifier) {
     Column(modifier.clip(RoundedCornerShape(16.dp)).background(BoxColor).padding(12.dp)) {
         Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Accent)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Color(0xFFC4C6D0), maxLines = 2)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Soft, maxLines = 2)
     }
 }
 
@@ -305,7 +305,7 @@ private fun DiaryLine(label: String, value: String) {
             withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append(value) }
         },
         style = MaterialTheme.typography.bodySmall,
-        color = Color(0xFFC4C6D0),
+        color = Soft,
     )
 }
 

@@ -36,7 +36,7 @@ data class Artwork(
     val story: String,
     val pageUrl: String,
 ) {
-    /** As a picture of the app ("Сложи за тапет"): the largest rendition, the screen one as a fallback. */
+    /** As a picture of the app ("Сложи като тапет"): the largest rendition, the screen one as a fallback. */
     fun candidate() = Candidate(
         key = "art:" + id.removePrefix("File:").replace(' ', '_'),
         sourceId = SOURCE_ID,

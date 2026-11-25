@@ -206,7 +206,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _art.value = null
     }
 
-    /** "Сложи за тапет" on the painting. */
+    /** "Сложи като тапет" on the painting. */
     fun applyArt(show: ArtShow) {
         if (_busy.value) return
         viewModelScope.launch {
@@ -282,7 +282,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** "Сложи за тапет" in the archive (downloads the picture when it is no longer on the phone). */
+    /** "Сложи като тапет" in the archive (downloads the picture when it is no longer on the phone). */
     fun applyArchive(entry: bg.dnevnitapet.archive.ArchiveEntry, onDone: () -> Unit) {
         if (_busy.value) return
         viewModelScope.launch {
@@ -418,7 +418,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val updater = graph.updater
         if (!updater.canInstall()) {
             installAfterPermission = true
-            say(tr("Разреши „Инсталиране от този източник“ и се върни – обновлението ще продължи само"))
+            say(tr("Разреши „Инсталиране от този източник“ и се върни – обновяването ще продължи само"))
             if (!updater.openInstallPermission()) say(tr("Отвори Настройки → Приложения → Дневен тапет и разреши инсталиране на приложения"))
             return
         }
@@ -428,7 +428,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val file = updater.download(release)
                 updater.install(file)
             } catch (e: Exception) {
-                say(tr("Обновлението не се изтегли: {0}. Опитай пак.", e.message ?: tr("грешка")))
+                say(tr("Новата версия не се изтегли: {0}. Опитай пак.", e.message ?: tr("грешка")))
             } finally {
                 _updateState.value = UpdateState.Idle
             }
@@ -617,7 +617,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     say(
                         when {
-                            before.size >= MAX_BROWSE_QUEUE -> tr("Стигна края – избери някоя от тези или се върни назад.")
+                            before.size >= MAX_BROWSE_QUEUE -> tr("Стигна до края – избери някоя от тези или се върни назад.")
                             settings.value.wifiOnly -> tr("Няма повече готови снимки. Нови ще изтегля, когато има Wi-Fi.")
                             else -> tr("Няма повече готови снимки в момента. Опитай пак след малко.")
                         },

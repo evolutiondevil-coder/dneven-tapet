@@ -403,7 +403,7 @@ private fun ArchiveSheet(vm: MainViewModel, e: ArchiveEntry, title: String, onDi
                 TextButton(onClick = { story = true }) {
                     Icon(Icons.Outlined.AutoStories, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(tr("Историята"))
+                    Text(tr("За снимката"))
                 }
                 if (c.infoUrl.isNotBlank()) {
                     TextButton(onClick = {

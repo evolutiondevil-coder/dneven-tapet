@@ -53,7 +53,7 @@ import bg.dnevnitapet.i18n.tr
 
 /**
  * "Пауза за изкуство": after every 20 pictures browsed, a famous painting in a frame, with the
- * painter, the year and its story in Bulgarian. "Сложи за тапет" or "Към снимките →".
+ * painter, the year and its story in Bulgarian. "Сложи като тапет" or "Към снимките →".
  */
 @Composable
 fun ArtBreak(show: MainViewModel.ArtShow, busy: Boolean, onApply: () -> Unit, onClose: () -> Unit) {
@@ -142,7 +142,7 @@ fun ArtBreak(show: MainViewModel.ArtShow, busy: Boolean, onApply: () -> Unit, on
                     modifier = Modifier.weight(1f).height(50.dp),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                    else Text(tr("Сложи за тапет"), maxLines = 1, softWrap = false)
+                    else Text(tr("Сложи като тапет"), maxLines = 1, softWrap = false)
                 }
                 Button(
                     onClick = onClose,
