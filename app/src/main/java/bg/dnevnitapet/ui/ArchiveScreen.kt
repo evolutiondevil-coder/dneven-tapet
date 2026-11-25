@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material3.Button
@@ -193,16 +194,23 @@ fun ArchiveScreen(vm: MainViewModel, onBack: () -> Unit) {
                                 )
                             }
                         }
-                        Text(
-                            when {
-                                web.query.isEmpty() -> tr("Милиони свободни снимки от Wikimedia Commons и NASA. Нищо не се пази в телефона – изтегля се само избраната.")
-                                web.loading && web.results.isEmpty() -> tr("Търся в интернет…")
-                                else -> tr("{0} снимки за „{1}“", web.results.size, web.query) + (web.english?.let { tr(" (и „{0}“)", it) } ?: "")
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 4.dp, top = 2.dp),
-                        )
+                        if (web.query.isEmpty()) {
+                            // Before the first search: what this is, in the same style as the empty screens.
+                            EmptyState(
+                                Icons.Outlined.TravelExplore,
+                                tr("Търси из милиони снимки"),
+                                tr("Милиони свободни снимки от Wikimedia Commons и NASA. Нищо не се пази в телефона – изтегля се само избраната."),
+                                Modifier.padding(top = 24.dp),
+                            )
+                        } else {
+                            Text(
+                                if (web.loading && web.results.isEmpty()) tr("Търся в интернет…")
+                                else tr("{0} снимки за „{1}“", web.results.size, web.query) + (web.english?.let { tr(" (и „{0}“)", it) } ?: ""),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                            )
+                        }
                     } else {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             item { ChoiceChip(selected = category == null, onClick = { category = null }, label = { Text(tr("Всички")) }) }
