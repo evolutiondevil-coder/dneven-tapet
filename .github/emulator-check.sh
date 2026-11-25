@@ -250,7 +250,7 @@ if has_text "Следваща"; then echo "OK: a tap ends the opening greeting";
 # "Пауза за изкуство" (a test-build switch opens it at once): the first painting asks whether more should come.
 adb shell am start -S -W -n bg.dnevnitapet/.ui.MainActivity --ez debugArt true > /dev/null
 shot 17-art-break 15
-if has_text "Да показвам ли картина на всеки 30 разгледани снимки?"; then echo "OK: the painting asks whether more should come"; else echo "FAIL: the art break question not shown"; fi | tee -a "$OUT/summary.txt"
+if has_text "Най-много веднъж, докато приложението е отворено."; then echo "OK: the painting asks whether more should come"; else echo "FAIL: the art break question not shown"; fi | tee -a "$OUT/summary.txt"
 echo "== texts on the art break:"; grep -oE 'text="[^"]+"' /tmp/ui.xml | head -n 20 || true
 tap "Да, показвай" && shot 17b-art-after-yes 2
 if has_text "Продължи"; then echo "OK: after yes the painting offers Продължи"; else echo "FAIL: Продължи not shown after yes"; fi | tee -a "$OUT/summary.txt"
