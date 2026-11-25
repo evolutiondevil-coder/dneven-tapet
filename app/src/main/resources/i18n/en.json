@@ -147,7 +147,6 @@
  "За албум на заключения екран избери „И двата“ в Настройки → Къде да се слага.": "For a lock screen album, choose “Both” in Settings → Where to put it.",
  "За приложението": "About the app",
  "За твоя телефон: {0}": "For your phone: {0}",
- "Заглавията и историите се превеждат на телефона · еднократно ~30 MB при Wi-Fi": "Titles and stories are translated on the phone · once ~30 MB over Wi-Fi",
  "Задръж": "Hold",
  "Задържан – не се сменя сам": "On hold – does not change by itself",
  "Заети: {0} (до 5 готови снимки, 30 в историята и любимите).\n": "Used: {0} (up to 5 ready pictures, 30 in history, and favourites).\n",
@@ -546,5 +545,11 @@
  "{0} ч {1} мин": "{0} h {1} min",
  "Виж историята": "See history",
  "За снимката": "About the picture",
- "Събития": "Events"
+ "Събития": "Events",
+ "Превод на телефона · еднократно ~30 MB при Wi-Fi": "Translated on the phone · once ~30 MB over Wi-Fi",
+ "Още нямаш любими": "No favourites yet",
+ "Докосни ♡ върху снимка, която харесваш, и тя ще се появи тук.": "Tap ♡ on a picture you like and it will appear here.",
+ "Още няма история": "No history yet",
+ "Още нямаш добавени снимки": "No photos added yet",
+ "Добави снимки от галерията и те ще се сменят като тапет.": "Add photos from your gallery and they will take turns as your wallpaper."
 }

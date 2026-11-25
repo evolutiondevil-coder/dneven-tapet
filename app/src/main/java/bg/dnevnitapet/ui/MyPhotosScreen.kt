@@ -136,11 +136,12 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
-                        Text(
-                            if (st.myPhotos.isEmpty()) tr("Още нямаш добавени снимки.")
-                            else tr("{0} снимки · {1} · до {2}", st.myPhotos.size, Format.megabytes(bytes), MyPhotos.MAX_PHOTOS),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        if (st.myPhotos.isNotEmpty()) {
+                            Text(
+                                tr("{0} снимки · {1} · до {2}", st.myPhotos.size, Format.megabytes(bytes), MyPhotos.MAX_PHOTOS),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                         Text(
                             tr("Приложението пази свои копия, нагодени за екрана. Снимките в галерията не се променят и не се трият."),
                             style = MaterialTheme.typography.bodySmall,
@@ -152,6 +153,14 @@ fun MyPhotosScreen(vm: MainViewModel, onBack: () -> Unit, onOpenCrop: () -> Unit
             if (st.myPhotos.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     AlbumsSection(vm, st, settings)
+                }
+            } else if (importing == null) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    EmptyState(
+                        Icons.Outlined.AddPhotoAlternate,
+                        tr("Още нямаш добавени снимки"),
+                        tr("Добави снимки от галерията и те ще се сменят като тапет."),
+                    )
                 }
             }
             items(st.myPhotos, key = { it.key }) { photo ->

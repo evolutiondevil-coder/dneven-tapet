@@ -260,7 +260,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
                     if (bg.dnevnitapet.i18n.I18n.language == bg.dnevnitapet.i18n.AppLanguage.BG) {
                         ToggleRow(
                             Icons.Outlined.Translate, Tint.BLUE, tr("Описания на български"),
-                            tr("Заглавията и историите се превеждат на телефона · еднократно ~30 MB при Wi-Fi"),
+                            tr("Превод на телефона · еднократно ~30 MB при Wi-Fi"),
                             s.translateStories,
                         ) { v -> update { it.copy(translateStories = v) } }
                     }
@@ -361,7 +361,7 @@ fun SettingsScreen(vm: MainViewModel, onBack: () -> Unit, onOpenMyPhotos: () -> 
             // ------------------------------------------------ sources
             item {
                 Group(tr("Източници")) {
-                    val names = SourceRegistry.all.filter { it.id in s.enabledSources && it.isConfigured(s) }.map { it.displayName }
+                    val names = SourceRegistry.all.filter { it.id in s.enabledSources && it.isConfigured(s) }.map { SourceRegistry.shortName(it.id) }
                     LinkRow(Icons.Outlined.Public, Tint.TEAL, tr("Източници на снимки"), names.joinToString(", ").ifBlank { tr("Няма включени") }, first = true) { sheet = Sheet.SOURCES }
                     LinkRow(
                         Icons.AutoMirrored.Outlined.Label, Tint.TEAL, tr("Категории"),
@@ -719,7 +719,7 @@ private fun RowTexts(title: String, subtitle: String, modifier: Modifier) {
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }

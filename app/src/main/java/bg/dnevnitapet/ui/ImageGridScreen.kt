@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -90,13 +91,12 @@ fun ImageGridScreen(vm: MainViewModel, favorites: Boolean, onBack: () -> Unit, o
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (items.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    if (favorites) tr("Още нямаш любими. Докосни ♡ върху снимка, която харесваш.")
-                    else tr("Тук ще виждаш последните 30 тапета."),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                if (favorites) {
+                    EmptyState(Icons.Outlined.FavoriteBorder, tr("Още нямаш любими"), tr("Докосни ♡ върху снимка, която харесваш, и тя ще се появи тук."))
+                } else {
+                    EmptyState(Icons.Outlined.History, tr("Още няма история"), tr("Тук ще виждаш последните 30 тапета."))
+                }
             }
         } else {
             LazyVerticalGrid(

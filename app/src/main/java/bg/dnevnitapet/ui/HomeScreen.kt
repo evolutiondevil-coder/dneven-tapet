@@ -105,6 +105,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -365,9 +366,11 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                             )
                             Spacer(Modifier.width(7.dp))
                             // The name on two lines, the second centred under the first.
+                            val scale = LocalDensity.current.fontScale
+                            val name = AppName.copy(fontSize = (13f / scale).sp, lineHeight = (14f / scale).sp)
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(tr("Дневен"), color = Color.White, style = AppName, maxLines = 1, softWrap = false)
-                                Text(tr("Тапет"), color = Color.White, style = AppName, maxLines = 1, softWrap = false)
+                                Text(tr("Дневен"), color = Color.White, style = name, maxLines = 1, softWrap = false)
+                                Text(tr("Тапет"), color = Color.White, style = name, maxLines = 1, softWrap = false)
                             }
                         }
                     }
@@ -448,7 +451,7 @@ fun HomeScreen(vm: MainViewModel, onNavigate: (Screen) -> Unit) {
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleLarge.copy(shadow = TextShadow),
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f),
                             )

@@ -21,6 +21,14 @@ object SourceRegistry {
 
     fun byId(id: String): ImageSource? = all.firstOrNull { it.id == id }
 
+    /** Short names for one line listing several sources. */
+    fun shortName(id: String): String = when (id) {
+        "spotlight" -> "Spotlight"
+        "wikimedia" -> "Wikimedia"
+        "apod" -> "NASA"
+        else -> name(id)
+    }
+
     fun name(id: String): String = when (id) {
         "bing" -> "Bing"
         "spotlight" -> "Windows Spotlight"
