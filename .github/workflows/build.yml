@@ -140,6 +140,20 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash .github/emulator-check.sh
 
+      # Small copies of the screenshots in the job log, readable without downloading the artifact.
+      - name: Print small screenshots into the log
+        if: always() && matrix.api-level == 35
+        continue-on-error: true
+        run: |
+          command -v convert >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick >/dev/null)
+          for f in emulator-out/*.png; do
+            [ -f "$f" ] || continue
+            echo "=====IMG $(basename "$f" .png)"
+            convert "$f" -resize 400x -strip -quality 55 jpg:- | base64 -w 0
+            echo
+            echo "=====END"
+          done
+
       - name: Upload screenshots and logs
         if: always()
         uses: actions/upload-artifact@v7
