@@ -142,7 +142,8 @@ class StoryTranslator(private val context: Context, private val settings: JsonFi
 
     private fun onUnmeteredNetwork(): Boolean = runCatching {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        cm.activeNetworkInfo?.isConnected == true && !cm.isActiveNetworkMetered
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+        caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true && !cm.isActiveNetworkMetered
     }.getOrDefault(false)
 
     companion object {

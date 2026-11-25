@@ -29,7 +29,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
@@ -127,7 +127,7 @@ fun ArtBreak(show: MainViewModel.ArtShow, busy: Boolean, onApply: () -> Unit, on
                         },
                         colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFFFB74D)),
                     ) {
-                        Icon(Icons.Outlined.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(tr("Уикипедия"))
                     }
