@@ -1,14 +1,11 @@
-## What's new in v1.8.0
+## What's new in v1.8.1
 
-- **A new, more modern look:** warm orange colours that no longer change every day, a new font and rounder shapes.
-- **Smooth:** screens slide in and out, and the back gesture shows where you will return.
-- **Large titles** in Settings, History, Favourites and My photos – they shrink while you scroll.
-- **Empty screens** now show an icon and a short hint of what to do.
-- **Nothing is cut off:** the picture title can take two lines, and the logo stays whole with a large font.
-- **All texts were reviewed** – spelling and the same words everywhere.
+- **“Art break” is rebuilt:** a clean title without machine text, the painter and the year, a short description, buttons that always fit, and a close button.
+- **Less often, and only if you want:** a painting comes every 30 pictures you browse, at most once while the app is open. The first one asks whether more should come – they come only after “Yes”.
+- **A new version is offered by itself when the app opens:** if the internet is not ready yet, the app tries again shortly.
 
-## In v1.7.4
+## In v1.8.0
 
-- The “Today” card: “On this day” from Wikipedia, a small photo of the wallpaper and how long until the next one.
+- A new, more modern look: warm colours, a new font, smooth transitions and reviewed texts.
 
 **Install:** on the phone tap the file `DnevenTapet-….apk` below (under “Assets”) and open it.
