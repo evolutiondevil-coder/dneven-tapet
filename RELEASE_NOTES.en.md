@@ -1,12 +1,14 @@
-## What's new in v1.7.4
+## What's new in v1.8.0
 
-- **The “Today” card (tap the logo) is new:** no buttons, calmer and more interesting.
-- **“On this day”:** every day one event from history that happened on today's date – from Wikipedia, with a “Read more on Wikipedia” link. Sad events are left out.
-- **The current wallpaper** shows with a small photo – tap it to read its story.
-- **How long is left:** an orange bar shows when the next picture comes.
+- **A new, more modern look:** warm orange colours that no longer change every day, a new font and rounder shapes.
+- **Smooth:** screens slide in and out, and the back gesture shows where you will return.
+- **Large titles** in Settings, History, Favourites and My photos – they shrink while you scroll.
+- **Empty screens** now show an icon and a short hint of what to do.
+- **Nothing is cut off:** the picture title can take two lines, and the logo stays whole with a large font.
+- **All texts were reviewed** – spelling and the same words everywhere.
 
-## In v1.7.3
+## In v1.7.4
 
-- The logo shows the whole name, and a tap opens “Today” and “My diary”.
+- The “Today” card: “On this day” from Wikipedia, a small photo of the wallpaper and how long until the next one.
 
 **Install:** on the phone tap the file `DnevenTapet-….apk` below (under “Assets”) and open it.
